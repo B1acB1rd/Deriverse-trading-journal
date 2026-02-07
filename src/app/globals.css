@@ -1,0 +1,97 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    /* Deriverse Brand Palette - Deep Space & Neon */
+    --color-background: #0B0B0F;
+    --color-surface: #13131A;
+    --color-surface-hover: #1C1C26;
+    --color-primary: #7C3AED;
+    /* Electric Violet */
+    --color-primary-glow: rgba(124, 58, 237, 0.5);
+    --color-accent: #06B6D4;
+    /* Cyan */
+    --color-success: #10B981;
+    --color-danger: #EF4444;
+    --color-warning: #F59E0B;
+    --color-text-primary: #F3F4F6;
+    --color-text-secondary: #9CA3AF;
+    --color-text-muted: #6B7280;
+    --color-border: rgba(255, 255, 255, 0.08);
+
+    /* Typography */
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono", "Courier New", monospace;
+
+    /* Glassmorphism Tokens */
+    --glass-bg: rgba(19, 19, 26, 0.7);
+    --glass-border: rgba(255, 255, 255, 0.08);
+    --glass-blur: 16px;
+
+    /* Animation Speeds */
+    --transition-fast: 150ms ease;
+    --transition-normal: 300ms ease;
+  }
+}
+
+/* Base Styles */
+body {
+  background-color: var(--color-background);
+  color: var(--color-text-primary);
+  /* font-family: 'Inter', sans-serif;  - Managed by Next.js Font */
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Premium Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-background);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-surface-hover);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-secondary);
+}
+
+/* Glass Utility Class */
+.glass-panel {
+  background-color: #13131ab3;
+  backdrop-filter: blur(24px);
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+
+  /* Fallback if tailwind not fully active yet */
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn var(--transition-normal) forwards;
+}
+
+/* Utility Animations using Tailwind classes ideally, but forcing some here */
+.transition-colors-fast {
+  transition: color 150ms ease, background-color 150ms ease, border-color 150ms ease;
+}
