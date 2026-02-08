@@ -58,15 +58,15 @@ export function PendingOrdersWidget() {
                                     <div className="flex items-center gap-2">
                                         <span className="text-sm font-bold text-white">{order.symbol || 'SOL-PERP'}</span>
                                         <span className={`text-xs px-1.5 py-0.5 rounded ${order.side === 'LONG' || order.type?.includes('Buy')
-                                                ? 'bg-solana-green/10 text-solana-green'
-                                                : 'bg-red-500/10 text-red-500'
+                                            ? 'bg-solana-green/10 text-solana-green'
+                                            : 'bg-red-500/10 text-red-500'
                                             }`}>
                                             {order.side || (order.type?.includes('Buy') ? 'LONG' : 'SHORT')}
                                         </span>
                                     </div>
                                     <div className="flex items-center gap-3 text-xs text-white/60 mt-0.5">
                                         <span>Limit: <span className="text-white font-mono">${order.price}</span></span>
-                                        <span>Size: <span className="text-white font-mono">{order.quantity}</span></span>
+                                        <span>Size: <span className="text-white font-mono">{order.amount || order.quantity || '—'}</span></span>
                                     </div>
                                 </div>
                             </div>

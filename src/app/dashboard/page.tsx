@@ -1,6 +1,5 @@
 import React from 'react';
 import { KpiGrid } from '@/components/dashboard/KpiGrid';
-import { PnLChart } from '@/components/dashboard/PnLChart';
 import { DataIntegrityPanel } from '@/components/dashboard/DataIntegrityPanel';
 import { TraderDNACard } from '@/components/dashboard/TraderDNACard';
 import { ProjectionsCard } from '@/components/dashboard/ProjectionsCard';
@@ -34,15 +33,12 @@ export default function DashboardPage() {
       {/* Row 2: KPIs */}
       <KpiGrid />
 
-      {/* Row 3: Charts & Projections */}
+      {/* Row 3: Projections & Data Integrity */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
-          <div className="glass-panel p-1 rounded-2xl">
-            <PnLChart />
-          </div>
-        </div>
-        <div className="space-y-6">
+        <div className="lg:col-span-2">
           <ProjectionsCard />
+        </div>
+        <div>
           <DataIntegrityPanel />
         </div>
       </div>

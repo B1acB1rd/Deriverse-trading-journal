@@ -691,7 +691,8 @@ export class DeriverseService {
                                         fee: 0,
                                         timestamp,
                                         status: 'COMPLETED',
-                                        section: 'Deposit'
+                                        section: 'Deposit',
+                                        chainTx: sig
                                     });
                                 } catch (err: any) {
                                     console.error(`[CRASH] Error pushing deposit: ${err.message}`, err);
@@ -714,7 +715,8 @@ export class DeriverseService {
                                         fee: 0,
                                         timestamp,
                                         status: 'COMPLETED',
-                                        section: 'Withdraw'
+                                        section: 'Withdraw',
+                                        chainTx: sig
                                     });
                                 } catch (err: any) {
                                     console.error(`[CRASH] Error pushing withdraw: ${err.message}`, err);
@@ -736,20 +738,154 @@ export class DeriverseService {
                                     fee: toNumber(l.rebates),
                                     timestamp,
                                     status: 'FILLED',
-                                    section: 'Spot'
+                                    section: 'Spot',
+                                    chainTx: sig
                                 });
                             } catch (err: any) {
                                 console.error(`[CRASH] Error parsing Maker Fill: ${err.message}`);
                             }
                         }
 
-                        // -- Taker Order (Tag 10) --
+                        // -- Taker Order (Tag 10) - SPOT --
                         if (toNumber(l.tag) === 10 && toNumber(l.clientId) === myClientId) {
                             myOrder = l;
                         }
 
                         if (toNumber(l.tag) === 11) {
                             fills.push(l);
+                        }
+
+                        // -- Perp Deposit (Tag 3) --
+                        if (toNumber(l.tag) === 3 && toNumber(l.clientId) === myClientId) {
+                            try {
+                                trades.push({
+                                    id: `perp-deposit-${sig}-${trades.length}`,
+                                    type: 'Perp Deposit',
+                                    side: 'LONG',
+                                    symbol: 'SOL-PERP',
+                                    price: 0,
+                                    size: toNumber(l.amount || l.funds),
+                                    pnl: 0,
+                                    fee: 0,
+                                    timestamp,
+                                    status: 'COMPLETED',
+                                    section: 'Perp',
+                                    chainTx: sig
+                                });
+                            } catch (err: any) {
+                                console.error(`[CRASH] Error parsing Perp Deposit: ${err.message}`);
+                            }
+                        }
+
+                        // -- Perp Withdraw (Tag 4) --
+                        if (toNumber(l.tag) === 4 && toNumber(l.clientId) === myClientId) {
+                            try {
+                                trades.push({
+                                    id: `perp-withdraw-${sig}-${trades.length}`,
+                                    type: 'Perp Withdraw',
+                                    side: 'SHORT',
+                                    symbol: 'SOL-PERP',
+                                    price: 0,
+                                    size: toNumber(l.amount || l.funds),
+                                    pnl: 0,
+                                    fee: 0,
+                                    timestamp,
+                                    status: 'COMPLETED',
+                                    section: 'Perp',
+                                    chainTx: sig
+                                });
+                            } catch (err: any) {
+                                console.error(`[CRASH] Error parsing Perp Withdraw: ${err.message}`);
+                            }
+                        }
+
+                        // -- Spot Trade (Tag 7) - tokens + crncy based --
+                        if (toNumber(l.tag) === 7 && toNumber(l.clientId) === myClientId) {
+                            try {
+                                const tokens = toNumber(l.tokens || 0);
+                                const crncy = toNumber(l.crncy || 0);
+                                const qty = toNumber(l.qty || 0);
+                                const side = toNumber(l.side);
+                                if (tokens > 0 || crncy > 0) {
+                                    trades.push({
+                                        id: `spot-tag7-${sig}-${l.orderId || trades.length}`,
+                                        type: 'Spot',
+                                        side: side === 0 ? 'LONG' : 'SHORT',
+                                        symbol: 'SOL/USDC',
+                                        price: tokens > 0 ? crncy / tokens : 0,
+                                        size: qty || tokens,
+                                        pnl: 0,
+                                        fee: 0,
+                                        timestamp,
+                                        status: 'FILLED',
+                                        section: 'Spot',
+                                        chainTx: sig
+                                    });
+                                }
+                            } catch (err: any) {
+                                console.error(`[CRASH] Error parsing Spot Tag 7: ${err.message}`);
+                            }
+                        }
+
+                        // -- Order Cancel (Tag 13) - skip, not a trade --
+
+                        // -- PERP TRADE (Tag 18) - This is the main perp order tag --
+                        if (toNumber(l.tag) === 18 && toNumber(l.clientId) === myClientId) {
+                            try {
+                                const perpSize = toNumber(l.perps || 0);
+                                const perpPrice = toNumber(l.price || 0);
+                                const side = toNumber(l.side);
+                                if (perpSize !== 0 && perpPrice !== 0) {
+                                    trades.push({
+                                        id: `perp-order-${sig}-${l.orderId || trades.length}`,
+                                        type: 'Perp',
+                                        side: side === 0 ? 'LONG' : 'SHORT',
+                                        symbol: 'SOL-PERP',
+                                        price: perpPrice,
+                                        size: Math.abs(perpSize),
+                                        pnl: 0, // PnL calculated separately from perpStats
+                                        fee: 0,
+                                        timestamp,
+                                        status: 'FILLED',
+                                        section: 'Perp',
+                                        chainTx: sig
+                                    });
+                                }
+                            } catch (err: any) {
+                                console.error(`[CRASH] Error parsing Perp Tag 18: ${err.message}`);
+                            }
+                        }
+
+                        // -- Funding Payment (Tag 24) --
+                        if (toNumber(l.tag) === 24 && toNumber(l.clientId) === myClientId) {
+                            try {
+                                const fundingAmount = toNumber(l.funding || 0);
+                                if (fundingAmount !== 0) {
+                                    trades.push({
+                                        id: `funding-${sig}-${trades.length}`,
+                                        type: 'Funding',
+                                        side: fundingAmount >= 0 ? 'LONG' : 'SHORT',
+                                        symbol: 'SOL-PERP',
+                                        price: 0,
+                                        size: Math.abs(fundingAmount),
+                                        pnl: fundingAmount, // Funding is realized PnL
+                                        fee: 0,
+                                        timestamp,
+                                        status: 'COMPLETED',
+                                        section: 'Funding',
+                                        chainTx: sig
+                                    });
+                                }
+                            } catch (err: any) {
+                                console.error(`[CRASH] Error parsing Funding Tag 24: ${err.message}`);
+                            }
+                        }
+
+                        // -- Debug: Log unknown/unhandled tags for discovery --
+                        const knownTags = [1, 2, 3, 4, 7, 10, 11, 13, 15, 18, 24];
+                        const currentTag = toNumber(l.tag);
+                        if (currentTag && !knownTags.includes(currentTag) && toNumber(l.clientId) === myClientId) {
+                            console.log(`[TradeHistory] Unknown tag ${currentTag} found for client. Log data:`, JSON.stringify(l, (_, v) => typeof v === 'bigint' ? v.toString() : v));
                         }
                     }
 
@@ -779,7 +915,8 @@ export class DeriverseService {
                                     fee: txFees,
                                     timestamp,
                                     status: 'FILLED',
-                                    section: 'Spot'
+                                    section: 'Spot',
+                                    chainTx: sig
                                 });
                             }
                         } catch (err: any) {

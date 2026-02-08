@@ -1,17 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { DeriverseService } from '@/services/DeriverseService';
+import { storeTrades, getTrades, updateAccountStats, getAccountStats } from '@/lib/AccountStorage';
+import { initializeIndexes } from '@/lib/mongodb';
 
 export const dynamic = 'force-dynamic';
+
+// Initialize MongoDB indexes on first load
+let indexesInitialized = false;
 
 export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const wallet = searchParams.get('wallet');
+    const refresh = searchParams.get('refresh') === 'true'; // Force refresh from chain
 
     if (!wallet) {
         return NextResponse.json({ success: false, error: 'Wallet address required' }, { status: 400 });
     }
 
     try {
+        // Initialize MongoDB indexes once
+        if (!indexesInitialized && process.env.MONGODB_URI) {
+            try {
+                await initializeIndexes();
+                indexesInitialized = true;
+            } catch (e) {
+                console.warn('[MongoDB] Failed to initialize indexes, continuing without caching:', e);
+            }
+        }
+
         const service = DeriverseService.getInstance();
         const clientData = await service.fetchClientData(wallet);
 
@@ -31,27 +47,20 @@ export async function GET(req: NextRequest) {
         }
 
         // Map Tokens to Dashboard Asset Format
-        // Note: This mapping depends on knowing which mint is which. 
-        // For now, we map dynamically based on known mints in env or generic.
         const assets = {
             sol: 0,
             usdc: 0,
             deriverse: 0
         };
 
-        // Helper to identify tokens (approximate if env vars match)
         const MINT_A = process.env.NEXT_PUBLIC_TOKEN_MINT_A;
         const MINT_B = process.env.NEXT_PUBLIC_TOKEN_MINT_B;
 
-        // CORRECT MAPPING based on official kit-example-retry:
-        // TOKEN_MINT_A = 9pan9bMn5HatX4EJdBwg9VgCa7Uz5HL8N1m5D3NdXejP = Wrapped SOL (Token ID 2)
-        // TOKEN_MINT_B = A2Pz6rVyXuadFkKnhMXd1w9xgSrZd8m8sEGpuGuyFhaj = Fake USDC (Token ID 1)
         clientData.balances.forEach(b => {
-            if (b.mint === MINT_A) assets.sol = b.amount; // MINT_A = SOL
-            else if (b.mint === MINT_B) assets.usdc = b.amount; // MINT_B = USDC
+            if (b.mint === MINT_A) assets.sol = b.amount;
+            else if (b.mint === MINT_B) assets.usdc = b.amount;
         });
 
-        // Set Equity
         assets.deriverse = clientData.equity || 0;
 
         // Map Positions
@@ -65,20 +74,39 @@ export async function GET(req: NextRequest) {
             leverage: p.leverage || 1
         }));
 
-        // Fetch Orders for active instruments
-        // We iterate through active positions instruments or all instruments?
-        // For efficiency, maybe just check the main instrument if known, 
-        // but robustly we should probably scan known instruments. 
-        // For now, we'll try to fetch orders for the active instruments found.
         let allOrders: any[] = [];
 
-        // Also try to fetch orders for Mint A/B instrument if defined
-        // const instruments = await service.getAvailableInstruments();
-        // ... logic to find relevant instruments ...
+        // === MONGODB CACHING: Trades ===
+        let trades: any[] = [];
 
+        if (process.env.MONGODB_URI) {
+            try {
+                // Get cached trades from MongoDB
+                const cachedTrades = await getTrades(wallet, { limit: 200 });
 
-        // Fetch real trade history from transaction logs
-        const trades = await service.fetchTradeHistory(wallet);
+                // Always fetch fresh trades from chain (or fetch only new ones)
+                const freshTrades = await service.fetchTradeHistory(wallet);
+
+                // Store new trades in MongoDB (with deduplication)
+                if (freshTrades.length > 0) {
+                    await storeTrades(wallet, freshTrades);
+                }
+
+                // Use fresh trades as the main source (includes latest data)
+                trades = freshTrades;
+
+                // Update account stats in MongoDB
+                await updateAccountStats(wallet, clientData.perpStats);
+
+                console.log(`[MongoDB] Cached ${freshTrades.length} trades for ${wallet.slice(0, 8)}...`);
+            } catch (dbError) {
+                console.warn('[MongoDB] Cache operation failed, using fresh data:', dbError);
+                trades = await service.fetchTradeHistory(wallet);
+            }
+        } else {
+            // No MongoDB configured, fetch directly
+            trades = await service.fetchTradeHistory(wallet);
+        }
 
         // Map LP Positions
         const lpPositions = clientData.lpPositions?.map(lp => ({
@@ -112,13 +140,13 @@ export async function GET(req: NextRequest) {
         // Construct Response
         return NextResponse.json({
             success: true,
-            balance: assets.usdc, // Main Equity approximated as USDC balance
+            balance: assets.usdc,
             assets,
             positions,
-            orders: [...allOrders, ...perpOpenOrders], // Include perp orders
-            trades, // Real trade history from logs
-            lpPositions, // LP/Liquidity positions
-            perpStats,   // Perp account statistics
+            orders: [...allOrders, ...perpOpenOrders],
+            trades,
+            lpPositions,
+            perpStats,
             pnl: {
                 unrealized: clientData.totalUnrealizedPnl || 0,
                 realized: clientData.totalRealizedPnl || 0,
@@ -132,3 +160,4 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ success: false, error: error.message }, { status: 500 });
     }
 }
+

@@ -1,96 +1,141 @@
-# Deriverse Trading Analytics Dashboard
+# Deriverse Analytics Platform
 
-**The Next-Generation Professional Trading Journal & Analytics Platform for Deriverse (Solana).**
+**A professional-grade trading journal and analytics suite for the Deriverse SOL ecosystem.**
 
-> 🚀 **On-Chain First**: Verifiable accuracy, unified risk analytics, and protocol-level event decoding—all designed specifically for the Deriverse ecosystem.
-
-## 🏗️ Architecture & Data Sources
-
-This platform follows a "Deriverse-Native" architecture, prioritizing protocol-level data over generic scraping.
-
-### Layer 1: Data Source (Core)
-- **Deriverse SDK / APIs**: The primary source of truth. We initialize the `Deriverse Engine` to stream real-time prices, account balances, and position states directly from the protocol.
-- **Protocol Event Decoding**: Trade history and order lifecycle events are reconstructed by decoding on-chain program logs using the official **Deriverse SDK** (`engine.logsDecode`). This ensures 100% accuracy with the protocol's internal logic.
-
-### Layer 2: Analytics Engine
-Our custom analysis layer takes this raw protocol data to compute:
-- **Trader DNA**: Algorithmic profiling of trading style (Scalper vs Swing, Risk Appetite).
-- **Execution Quality**: Analyzing slippage and fee drag.
-- **PnL Attribution**: distinguishing between gross trading performance and net returns after fees.
-
-### Layer 3: On-Chain Awareness
-We use standard Solana RPC endpoints (with optional Helius enhancement) only for:
-- Transaction confirmation timing.
-- Fetching raw transaction histories for the SDK to decode.
-
-> **Note:** This platform checks `Deriverse` state first. It does not act as a generic Solana explorer.
+> 🚀 **Real Data Only**: This platform is built on a "Verify, Don't Trust" philosophy. It connects directly to the Solana blockchain to decode Deriverse protocol events. **No mock data is used.**
 
 ---
 
-## 📊 Core Features
+## 🌟 Key Features
 
-### Dashboard & Analytics (Tier 1)
-✅ **KPI Grid**: Total PnL, Win Rate, Trading Volume based on **real on-chain history**  
-✅ **PnL Chart**: Cumulative profit curve derived from decoded trade logs  
-✅ **Trader DNA Profile**: Identifies your archetype (Scalper/Swing/Position) from your actua trading behavior  
-✅ **Data Integrity Panel**: Live protocol state verification  
+### 1. Advanced Trading Dashboard
+- **Real-Time PnL**: Tracks realized and unrealized profit/loss directly from on-chain positions.
+- **Performance Metrics**: Win Rate, Long/Short Bias, Sharpe Ratio approximations.
+- **Visual Analytics**: Interactive charts for Cumulative PnL, Drawdown, and Asset Allocation.
 
-### Professional Journaling (Tier 2)
-✅ **Trade History Table**: Sortable log of all decoded Deriverse events (Deposit, Fill, Fees)  
-✅ **Fee Breakdown**: Exact calculation of protocol fees vs gas fees  
-✅ **Auto-Save Annotations**: Trader notes are persisted locally  
+### 2. Smart Trade Journal (MongoDB Persisted)
+- **Automatic Sync**: Trades are fetched from the blockchain and synced to a MongoDB database.
+- **Rich Annotations**: Add notes, tags, and emotional states to every trade.
+- **Persistent Storage**: Unlike local-only solutions, your journal data is safely stored in the cloud (MongoDB Atlas), accessible across devices.
 
----
+### 3. Trader DNA (Powered by Gemini AI)
+- **AI Analysis**: Uses Google's Gemini AI to analyze your trading history and generate a psychological profile (e.g., "Disciplined Swing Trader" or "Impulsive Scalper").
+- **Algorithmic Fallback**: Robust statistical analysis provides insights even if AI services are unavailable.
+- **Strengths & Weaknesses**: Identifies patterns in your trading behavior to help you improve.
 
-## 🛠️ Tech Stack
-
-| Layer | Technology | Why |
-|-------|-----------|-----|
-| **Framework** | Next.js 16 (App Router) | Enterprise React patterns |
-| **Protocol** | **@deriverse/kit** | Official Protocol SDK for decoding & interaction |
-| **Data** | Solana RPC + Helius (Optional) | Transaction history fetching |
-| **Styling** | Tailwind CSS v4 + Vanilla CSS | Premium glassmorphism |
-| **Charts** | Recharts | Responsive financial visualization |
+### 4. Deep Analytics
+- **PnL Attribution**: Breaks down your results into Gross PnL, Fees Paid, and Slippage impact.
+- **Order Type Analysis**: Compares performance between Market and Limit orders.
+- **Psychology Chart**: Correlates your emotional state (e.g., "Confident", "Anxious") with trade outcomes.
 
 ---
 
-## 📦 Installation & Setup
+## 🏗️ Architecture
 
-1. **Clone & Navigate**:
+The platform is built using a modern Next.js 14 stack, aimed at performance and scalability.
+
+```mermaid
+graph TD
+    User[User Browser] <--> Frontend[Next.js App Router]
+    Frontend <--> API[Next.js API Routes]
+    
+    subgraph "Data Layer"
+        API <--> Mongo[MongoDB Atlas]
+        API <--> RPC[Solana RPC]
+        API <--> Gemini[Google Gemini AI]
+    end
+
+    subgraph "Protocol"
+        RPC <--> Deriverse[Deriverse Smart Contracts]
+    end
+```
+
+### Core Components
+- **Frontend**: React, TailwindCSS, Recharts.
+- **Backend API**: Next.js Server Actions & API Routes (`/api/deriverse`, `/api/journal`, `/api/trader-dna`).
+- **Database**: MongoDB (via `mongoose`) for caching trades and storing user journal entries.
+- **Blockchain Integration**: `@deriverse/kit` & `@solana/web3.js` for fetching and decoding instruction logs.
+
+### Data Flow
+1. **Fetch**: The application queries Solana RPC for transaction signatures associated with your wallet.
+2. **Decode**: It uses the Deriverse SDK to decode binary instruction data into readable trade events (Open, Close, Liquidate).
+3. **Cache**: Validated trades are stored in MongoDB to reduce RPC calls and enable fast historical analysis.
+4. **Analyze**: The backend aggregators (and Gemini AI) process this data to generate insights.
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+- Node.js 18+
+- MongoDB Connection String (Atlas or Local)
+- Google Gemini API Key (Optional, for AI features)
+- Solana RPC URL (Optional, uses public endpoints by default)
+
+### Installation
+
+1. **Clone the repository:**
    ```bash
+   git clone https://github.com/your-repo/deriverse-analytics.git
    cd deriverse-analytics
    ```
 
-2. **Install Dependencies**:
+2. **Install dependencies:**
    ```bash
    npm install
    ```
 
-3. **Configure RPC (Optional)**:
-   Create `.env.local` with your RPC URL to avoid rate limits (defaults to public devnet):
+3. **Configure Environment:**
+   Create a `.env.local` file in the root directory:
    ```env
-   NEXT_PUBLIC_RPC_ENDPOINT=https://your-rpc-provider.com
-   NEXT_PUBLIC_SOLANA_NETWORK=devnet
+   # Database (Required for Journal & Caching)
+   MONGODB_URI=mongodb+srv://user:pass@cluster.mongodb.net/
+   MONGODB_DB_NAME=deriverse_analytics
+
+   # AI Analysis (Optional)
+   GEMINI_API_KEY=your_gemini_api_key
+
+   # Blockchain (Optional)
+   NEXT_PUBLIC_RPC_ENDPOINT=https://api.mainnet-beta.solana.com
    ```
 
-4. **Run Development Server**:
+4. **Run Locally:**
    ```bash
    npm run dev
    ```
-   Open [http://localhost:3000](http://localhost:3000).
+   Access the app at `http://localhost:3000`.
 
 ---
 
-## ⚠️ Important Disclaimers
+## 📦 Deployment
 
-### Production Readiness
-This project is currently configured for **Devnet**. To deploy live:
-1. Update `NEXT_PUBLIC_DERIVERSE_PROGRAM_ID` to the specific Mainnet deployment.
-2. Switch `NEXT_PUBLIC_SOLANA_NETWORK` to `mainnet-beta`.
+This project supports two deployment models. See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed instructions.
 
-### Not Financial Advice
-This tool is **purely analytical**. Trader DNA insights and suggestions are for educational purposes only.
+### Option 1: Unified (Recommended)
+Deploy the entire app (Frontend + API) to **Vercel** or a Docker container. This is the simplest approach.
+
+### Option 2: Decoupled
+Deploy the API routes as a standalone backend service (e.g., on Railway/Render) and the frontend as a static site. Useful for scaling components independently.
 
 ---
 
-**Built for the Deriverse Hackathon 2026**
+## 🧪 Verification
+
+To ensure data accuracy, run the verification suite (if implemented) or check the **Data Integrity** panel in the dashboard.
+
+- **No Mock Data**: All charts and metrics are calculated from `src/hooks/useTradeData.tsx` which consumes the real API.
+- **Calculation Audit**: All metrics (PnL, Fees, Volume) have been audited for FIFO accuracy.
+
+---
+
+## 🤝 Contributing
+
+1. Fork the Project
+2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the Branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+---
+
+**Built with ❤️ for the Deriverse Community.**

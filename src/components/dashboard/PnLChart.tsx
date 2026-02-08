@@ -43,11 +43,15 @@ export function PnLChart() {
                     <h3 className="text-lg font-bold text-text-primary">Cumulative PnL & Drawdown</h3>
                     <p className="text-xs text-text-muted">Realized performance over time</p>
                 </div>
-                {/* Tier 2 Insight Callout */}
-                <div className="bg-surface/50 border border-primary/20 px-3 py-1.5 rounded-lg">
-                    <span className="text-secondary text-xs">Insight: </span>
-                    <span className="text-text-primary text-xs font-medium">Drawdown recovers 20% faster in NY Session</span>
-                </div>
+                {/* Dynamic Insight based on drawdown analysis */}
+                {data.length > 0 && (
+                    <div className="bg-surface/50 border border-primary/20 px-3 py-1.5 rounded-lg">
+                        <span className="text-secondary text-xs">Max Drawdown: </span>
+                        <span className="text-text-primary text-xs font-medium">
+                            {formatCurrency(Math.min(...data.map(d => d.drawdown)))}
+                        </span>
+                    </div>
+                )}
             </div>
 
             <div className="flex-1 w-full min-h-[300px] relative">

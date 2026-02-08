@@ -85,10 +85,20 @@ export function PnLAttributionChart() {
                 </ResponsiveContainer>
             </div>
 
-            <div className="mt-4 pt-3 border-t border-glass-border flex justify-between items-center text-xs">
-                <span className="text-text-muted">Total Slippage Impact (30d):</span>
-                <span className="text-danger font-bold">- $170.00 (7% of Profits)</span>
-            </div>
+            {/* Calculate total slippage from real trade data */}
+            {(() => {
+                const totalSlippage = data.reduce((sum, d) => sum + Math.abs(d.Slippage), 0);
+                const totalNet = data.reduce((sum, d) => sum + d.Net, 0);
+                const slippagePercent = totalNet !== 0 ? Math.abs((totalSlippage / Math.abs(totalNet)) * 100) : 0;
+                return (
+                    <div className="mt-4 pt-3 border-t border-glass-border flex justify-between items-center text-xs">
+                        <span className="text-text-muted">Total Slippage Impact:</span>
+                        <span className="text-danger font-bold">
+                            - ${totalSlippage.toFixed(2)} ({slippagePercent.toFixed(1)}% of Net PnL)
+                        </span>
+                    </div>
+                );
+            })()}
         </div>
     );
 }

@@ -105,30 +105,11 @@ export function KpiGrid() {
                 icon={Activity}
             />
             <KpiCard
-                title="Avg Duration"
-                value={avgDurationFormatted}
-                change="Session Time"
-                isPositive={true}
-                icon={Timer}
-            />
-            <KpiCard
                 title="Long/Short Bias"
                 value={longShortRatio}
                 change={`${longCount}L / ${shortCount}S`}
                 isPositive={longCount > shortCount}
                 icon={Scale}
-            />
-            <KpiCard
-                title="Largest Win"
-                value={formatCurrency(largestWin)}
-                isPositive={true}
-                icon={Trophy}
-            />
-            <KpiCard
-                title="Largest Loss"
-                value={formatCurrency(largestLoss)}
-                isPositive={false}
-                icon={TrendingDown}
             />
             <KpiCard
                 title="Net PnL (Fees)"

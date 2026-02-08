@@ -1,11 +1,9 @@
 import React from 'react';
 import { PnLAttributionChart } from '@/components/analytics/PnLAttributionChart';
-import { LiquidityHeatmap } from '@/components/analytics/LiquidityHeatmap';
 import { PsychologyChart } from '@/components/analytics/PsychologyChart';
 import { OrderTypePerformance } from '@/components/analytics/OrderTypePerformance';
 import { DrawdownChart } from '@/components/analytics/DrawdownChart';
 import { DateRangeFilter } from '@/components/common/DateRangeFilter';
-import { Zap } from 'lucide-react';
 
 export default function AnalyticsPage() {
     return (
@@ -24,16 +22,10 @@ export default function AnalyticsPage() {
                 <PsychologyChart />
             </div>
 
-            {/* Middle Row: New Analytics */}
+            {/* Bottom Row: Order Performance & Drawdown */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <OrderTypePerformance />
                 <DrawdownChart />
-            </div>
-
-            {/* Bottom Row: Liquidity Heatmap */}
-            <div>
-                <h3 className="text-lg font-semibold text-white mb-4">Market Depth Analysis</h3>
-                <LiquidityHeatmap />
             </div>
         </div>
     );

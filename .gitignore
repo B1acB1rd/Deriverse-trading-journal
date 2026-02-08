@@ -35,6 +35,7 @@ yarn-error.log*
 .env
 .env.*
 !.env.example
+.env.local
 
 # vercel
 .vercel
@@ -56,6 +57,7 @@ deriverse_documentation.md
 deriverse_reference_data.md
 CURRENT_PROBLEMS.md
 README_OLD.md
+DEPLOYMENT.md
 
 # Example/test directories
 kit-example-retry/
