@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Disable React Strict Mode to prevent double effect execution (duplicate API calls)
+  reactStrictMode: false,
 };
 
 export default nextConfig;

@@ -51,6 +51,3 @@ next-env.d.ts
 
 # Debug/Development scripts (not needed for submission)
 /scripts/
-
-# Backend node_modules (if separate)
-/backend/node_modules/
