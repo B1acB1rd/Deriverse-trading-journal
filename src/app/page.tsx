@@ -20,7 +20,14 @@ export default function LandingPage() {
     return (
         <div className="relative min-h-screen w-full bg-[#050505] text-white overflow-hidden flex flex-col font-sans">
 
-            <div className="absolute top-0 right-0 w-full h-full md:w-[65%] overflow-hidden opacity-90 pointer-events-none z-0">
+            {/* Wave Background with gradient fade on the left */}
+            <div
+                className="absolute top-0 right-0 w-full h-full overflow-hidden opacity-90 pointer-events-none z-0"
+                style={{
+                    maskImage: 'linear-gradient(to right, transparent 0%, black 40%)',
+                    WebkitMaskImage: 'linear-gradient(to right, transparent 0%, black 40%)'
+                }}
+            >
                 <WaveBackground />
             </div>
 
