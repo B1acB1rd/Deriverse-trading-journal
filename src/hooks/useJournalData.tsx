@@ -79,21 +79,43 @@ export function useJournalData(walletAddress: string | null) {
             const updated = { ...existing, ...data, updatedAt: new Date().toISOString() };
             const nextState = { ...prev, [tradeId]: updated };
 
-
+            // Save to localStorage immediately (instant local backup)
             localStorage.setItem(localKey, JSON.stringify(nextState));
 
+            // Persist to MongoDB with retry
+            const persistToMongoDB = async (attempt: number = 1) => {
+                try {
+                    const response = await fetch('/api/journal', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            wallet: walletAddress,
+                            tradeId,
+                            entry: updated
+                        })
+                    });
 
-            fetch('/api/journal', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    wallet: walletAddress,
-                    tradeId,
-                    entry: updated
-                })
-            }).catch(err => {
-                console.warn('[Journal] MongoDB save failed:', err);
-            });
+                    const result = await response.json();
+
+                    if (!result.success) {
+                        throw new Error(result.error || 'Save failed');
+                    }
+
+                    if (!result.persisted) {
+                        console.warn('[Journal] Entry saved locally only — MongoDB not available');
+                    }
+                } catch (err: any) {
+                    console.error(`[Journal] MongoDB save failed (attempt ${attempt}):`, err.message);
+                    // Retry once after 2 seconds
+                    if (attempt < 2) {
+                        setTimeout(() => persistToMongoDB(attempt + 1), 2000);
+                    } else {
+                        console.error('[Journal] MongoDB save failed after retries. Entry saved in localStorage only.');
+                    }
+                }
+            };
+
+            persistToMongoDB();
 
             return nextState;
         });

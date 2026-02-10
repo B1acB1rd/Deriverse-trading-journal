@@ -4,30 +4,40 @@ import { getDatabase, getTradesCollection, getAccountStatsCollection, TradeDocum
  * Store trades to MongoDB (with deduplication)
  */
 export async function storeTrades(walletAddress: string, trades: any[]): Promise<number> {
+    if (!trades || trades.length === 0) {
+        console.log('[AccountStorage] No trades to store');
+        return 0;
+    }
+
     const collection = await getTradesCollection();
     let insertedCount = 0;
+    let errorCount = 0;
 
     for (const trade of trades) {
         try {
+            if (!trade.id) {
+                console.warn('[AccountStorage] Skipping trade with no ID');
+                continue;
+            }
+
             const tradeDoc: TradeDocument = {
                 walletAddress,
                 tradeId: trade.id,
-                type: trade.type || 'Spot',
-                side: trade.side,
-                symbol: trade.symbol,
-                price: trade.price || 0,
-                size: trade.size || 0,
-                fee: trade.fee || 0,
-                pnl: trade.pnl || 0,
-                realizedPnl: trade.realizedPnl || 0,
-                timestamp: new Date(trade.timestamp),
-                signature: trade.id.split('-')[1] || trade.id,
-                section: trade.section || trade.type,
+                type: trade.type || trade.section || 'Unknown',
+                side: trade.side || 'LONG',
+                symbol: trade.symbol || 'Unknown',
+                price: Number(trade.price) || 0,
+                size: Number(trade.size) || 0,
+                fee: Number(trade.fee) || 0,
+                pnl: Number(trade.pnl) || 0,
+                realizedPnl: Number(trade.realizedPnl) || 0,
+                timestamp: new Date(trade.timestamp || Date.now()),
+                signature: trade.chainTx || trade.id.split('-')[1] || trade.id,
+                section: trade.section || trade.type || 'Unknown',
                 createdAt: new Date(),
                 updatedAt: new Date()
             };
 
-            // Upsert (insert if not exists)
             const result = await collection.updateOne(
                 { walletAddress, tradeId: trade.id },
                 {
@@ -41,11 +51,12 @@ export async function storeTrades(walletAddress: string, trades: any[]): Promise
                 insertedCount++;
             }
         } catch (error: any) {
-            console.warn(`[AccountStorage] Failed to store trade ${trade.id}: ${error.message}`);
+            errorCount++;
+            console.error(`[AccountStorage] Failed to store trade ${trade.id}: ${error.message}`);
         }
     }
 
-    console.log(`[AccountStorage] Stored ${insertedCount} new trades for ${walletAddress}`);
+    console.log(`[AccountStorage] Stored ${insertedCount} new trades for ${walletAddress.slice(0, 8)}... (${errorCount} errors, ${trades.length} total)`);
     return insertedCount;
 }
 

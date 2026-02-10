@@ -76,35 +76,78 @@ export async function GET(req: NextRequest) {
 
         let allOrders: any[] = [];
 
-        // MongoDB trade caching
+        // MongoDB trade caching: fetch fresh, persist, fall back to cache if chain fails
         let trades: any[] = [];
 
         if (process.env.MONGODB_URI) {
             try {
-
-                const cachedTrades = await getTrades(wallet, { limit: 200 });
-
-
+                // Always try to fetch fresh trades from blockchain
                 const freshTrades = await service.fetchTradeHistory(wallet);
 
-
                 if (freshTrades.length > 0) {
-                    await storeTrades(wallet, freshTrades);
+                    // Persist fresh trades to MongoDB for cross-device access
+                    try {
+                        const storedCount = await storeTrades(wallet, freshTrades);
+                        console.log(`[API] Persisted ${storedCount} new trades to MongoDB`);
+                    } catch (storeError: any) {
+                        console.error(`[API] Failed to persist trades: ${storeError.message}`);
+                    }
+                    trades = freshTrades;
+                } else {
+                    // No fresh trades from chain — try loading from MongoDB cache
+                    console.log('[API] No fresh trades from chain, loading from MongoDB cache');
+                    const cachedTrades = await getTrades(wallet, { limit: 500 });
+                    if (cachedTrades.length > 0) {
+                        trades = cachedTrades.map(t => ({
+                            id: t.tradeId,
+                            type: t.type,
+                            side: t.side,
+                            symbol: t.symbol,
+                            price: t.price,
+                            size: t.size,
+                            pnl: t.pnl,
+                            fee: t.fee,
+                            realizedPnl: t.realizedPnl,
+                            timestamp: t.timestamp instanceof Date ? t.timestamp.toISOString() : t.timestamp,
+                            status: 'COMPLETED',
+                            section: t.section,
+                            chainTx: t.signature
+                        }));
+                        console.log(`[API] Loaded ${trades.length} cached trades from MongoDB`);
+                    }
                 }
 
-
-                trades = freshTrades;
-
-
+                // Update account stats
                 await updateAccountStats(wallet, clientData.perpStats);
 
-                console.log(`[MongoDB] Cached ${freshTrades.length} trades for ${wallet.slice(0, 8)}...`);
-            } catch (dbError) {
-                console.warn('[MongoDB] Cache operation failed, using fresh data:', dbError);
-                trades = await service.fetchTradeHistory(wallet);
+            } catch (fetchError: any) {
+                // Blockchain fetch failed entirely — fall back to cached trades
+                console.warn(`[API] Blockchain fetch failed: ${fetchError.message}, falling back to MongoDB cache`);
+                try {
+                    const cachedTrades = await getTrades(wallet, { limit: 500 });
+                    trades = cachedTrades.map(t => ({
+                        id: t.tradeId,
+                        type: t.type,
+                        side: t.side,
+                        symbol: t.symbol,
+                        price: t.price,
+                        size: t.size,
+                        pnl: t.pnl,
+                        fee: t.fee,
+                        realizedPnl: t.realizedPnl,
+                        timestamp: t.timestamp instanceof Date ? t.timestamp.toISOString() : t.timestamp,
+                        status: 'COMPLETED',
+                        section: t.section,
+                        chainTx: t.signature
+                    }));
+                    console.log(`[API] Loaded ${trades.length} cached trades from MongoDB (fallback)`);
+                } catch (cacheError: any) {
+                    console.error(`[API] MongoDB cache fallback also failed: ${cacheError.message}`);
+                    trades = [];
+                }
             }
         } else {
-
+            // No MongoDB configured — fetch from blockchain only
             trades = await service.fetchTradeHistory(wallet);
         }
 

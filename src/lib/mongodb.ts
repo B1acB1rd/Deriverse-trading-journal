@@ -50,7 +50,7 @@ export interface TradeDocument {
     _id?: ObjectId;
     walletAddress: string;
     tradeId: string;
-    type: 'Spot' | 'Perp' | 'Deposit' | 'Withdraw';
+    type: string;
     side: 'LONG' | 'SHORT';
     symbol: string;
     price: number;
