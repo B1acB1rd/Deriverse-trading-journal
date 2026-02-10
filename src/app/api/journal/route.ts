@@ -66,8 +66,9 @@ export async function GET(req: NextRequest) {
 
         return NextResponse.json({ success: true, entries: entriesMap, source: 'mongodb' });
     } catch (error: any) {
-        console.error('[Journal API] GET Error:', error);
-        return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+        console.warn('[Journal API] MongoDB unavailable, falling back to localStorage-only mode:', error.message);
+        // Gracefully degrade — return empty so the frontend uses localStorage
+        return NextResponse.json({ success: true, entries: {}, source: 'none' });
     }
 }
 
@@ -123,7 +124,8 @@ export async function POST(req: NextRequest) {
         console.log(`[Journal] Saved entry for trade ${tradeId.slice(0, 20)}...`);
         return NextResponse.json({ success: true, persisted: true, source: 'mongodb' });
     } catch (error: any) {
-        console.error('[Journal API] POST Error:', error);
-        return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+        console.warn('[Journal API] MongoDB save failed, localStorage will be used:', error.message);
+        // Gracefully degrade — entry is still saved in localStorage on the client
+        return NextResponse.json({ success: true, persisted: false, source: 'none' });
     }
 }

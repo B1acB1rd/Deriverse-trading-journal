@@ -12,7 +12,10 @@ let db: Db | null = null;
  */
 export async function getMongoClient(): Promise<MongoClient> {
     if (!client) {
-        client = new MongoClient(MONGODB_URI);
+        client = new MongoClient(MONGODB_URI, {
+            serverSelectionTimeoutMS: 5000,
+            connectTimeoutMS: 5000,
+        });
         await client.connect();
         console.log('[MongoDB] Connected to database');
     }

@@ -199,39 +199,7 @@ export function TradeProvider({ children }: { children: ReactNode }) {
     // Initialize Journal Hook
     const { hydrateTrades, saveEntry: saveJournalEntry } = useJournalData(publicKey ? publicKey.toString() : null);
 
-    // --- Auth State ---
-    const [authToken, setAuthToken] = useState<string | null>(null);
-    const { signMessage } = useWallet();
 
-    const login = useCallback(async () => {
-        if (!publicKey || !signMessage) return null;
-        try {
-            const timestamp = Date.now().toString();
-            const message = `Login to Deriverse Analytics\nTimestamp: ${timestamp}\nWallet: ${publicKey.toString()}`;
-            const messageBytes = new TextEncoder().encode(message);
-
-            const signature = await signMessage(messageBytes);
-            // Convert Uint8Array to Base64
-            const signatureBase64 = btoa(String.fromCharCode(...signature));
-
-            const res = await fetch('/api/auth', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    wallet: publicKey.toString(),
-                    timestamp,
-                    signature: signatureBase64
-                })
-            });
-
-            if (!res.ok) throw new Error('Auth failed');
-            const data = await res.json();
-            return data.token;
-        } catch (e) {
-            console.error("Login failed:", e);
-            return null;
-        }
-    }, [publicKey, signMessage]);
 
     const loadData = useCallback(async () => {
         if (!connected || !publicKey) {
@@ -240,54 +208,15 @@ export function TradeProvider({ children }: { children: ReactNode }) {
             setProfile(null);
             setBalance(0);
             setAssets({ sol: 0, usdc: 0, deriverse: 0 });
-            setAuthToken(null);
             return;
         }
 
         setIsLoading(true);
         try {
-            // Get or Fetch Token
-            let token = authToken;
-            if (!token) {
-                // Try to get from localStorage first to avoid popup spam
-                const stored = localStorage.getItem(`auth-${publicKey.toString()}`);
-                if (stored) {
-                    token = stored;
-                    setAuthToken(stored);
-                } else {
-                    // Note: Auto-popup might be aggressive. Ideally triggered by user action.
-                    // But for this "fix privacy" task, we must secure the data.
-                    // We will try to login.
-                    token = await login();
-                    if (token) {
-                        setAuthToken(token);
-                        localStorage.setItem(`auth-${publicKey.toString()}`, token);
-                    }
-                }
-            }
-
-            if (!token) {
-                console.warn("User not authenticated");
-                setIsLoading(false);
-                return;
-            }
-
             console.log("Fetching Deriverse data...");
-            const response = await fetch(`/api/deriverse?wallet=${publicKey.toString()}`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
+            const response = await fetch(`/api/deriverse?wallet=${publicKey.toString()}`);
 
-            if (response.status === 401) {
-                // Token expired
-                console.warn("Token expired, clearing...");
-                localStorage.removeItem(`auth-${publicKey.toString()}`);
-                setAuthToken(null);
-                // Retry login once? Or just fail and let next effect handling it?
-                // For safety, just stop. Next click/refresh will try login.
-                return;
-            }
+
 
             if (!response.ok) {
                 console.error(`Deriverse API Error: ${response.status} ${response.statusText}`);
@@ -393,7 +322,7 @@ export function TradeProvider({ children }: { children: ReactNode }) {
         } finally {
             setIsLoading(false);
         }
-    }, [connection, publicKey, connected, hydrateTrades, authToken, login]); // Added authToken and login deps
+    }, [connection, publicKey, connected, hydrateTrades]);
 
     // --- Date Filtering Logic ---
     const [dateRange, setDateRange] = useState<'ALL' | '7D' | '30D' | '90D'>('ALL');
