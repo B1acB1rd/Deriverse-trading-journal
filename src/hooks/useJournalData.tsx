@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Trade } from '../types';
 
 export interface JournalEntry {
-    id: string; // Counts as the Transaction Signature
+    id: string;
     strategyId?: string;
     manualEntryPrice?: number;
     manualFees?: number;
@@ -23,7 +23,7 @@ export function useJournalData(walletAddress: string | null) {
     const [entries, setEntries] = useState<Record<string, JournalEntry>>({});
     const [isLoaded, setIsLoaded] = useState(false);
 
-    // Load from LocalStorage first (fast), then sync with MongoDB
+
     useEffect(() => {
         if (!walletAddress) {
             setEntries({});
@@ -33,7 +33,7 @@ export function useJournalData(walletAddress: string | null) {
 
         const localKey = `deriverse_journal_${walletAddress}`;
 
-        // 1. Load from localStorage first (instant)
+
         const saved = localStorage.getItem(localKey);
         if (saved) {
             try {
@@ -43,7 +43,7 @@ export function useJournalData(walletAddress: string | null) {
             }
         }
 
-        // 2. Sync from MongoDB (async)
+
         const syncFromMongoDB = async () => {
             try {
                 const response = await fetch(`/api/journal?wallet=${walletAddress}`);
@@ -68,7 +68,7 @@ export function useJournalData(walletAddress: string | null) {
         syncFromMongoDB();
     }, [walletAddress]);
 
-    // Save entry - persists to both localStorage (fast) and MongoDB (persistent)
+
     const saveEntry = useCallback((tradeId: string, data: Partial<JournalEntry>) => {
         if (!walletAddress) return;
 
@@ -79,10 +79,10 @@ export function useJournalData(walletAddress: string | null) {
             const updated = { ...existing, ...data, updatedAt: new Date().toISOString() };
             const nextState = { ...prev, [tradeId]: updated };
 
-            // 1. Persist to LocalStorage immediately (fast)
+
             localStorage.setItem(localKey, JSON.stringify(nextState));
 
-            // 2. Persist to MongoDB (async, non-blocking)
+
             fetch('/api/journal', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -99,7 +99,7 @@ export function useJournalData(walletAddress: string | null) {
         });
     }, [walletAddress]);
 
-    // Hydrate helper: Merges on-chain trade with local journal data
+
     const hydrateTrades = useCallback((trades: Trade[]): Trade[] => {
         return trades.map(t => {
             const entry = entries[t.id];

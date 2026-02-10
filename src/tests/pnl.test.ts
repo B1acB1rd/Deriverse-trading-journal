@@ -1,5 +1,5 @@
-import { calculateFifoPnl } from '../src/lib/pnl';
-import { Trade } from '../src/types';
+import { calculateFifoPnl } from '../lib/pnl';
+import { Trade } from '../types';
 
 const createTrade = (overrides: Partial<Trade> = {}): Trade => ({
     id: 'test',

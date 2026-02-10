@@ -1,6 +1,6 @@
 
-import { calculateGaslessSavings, calculatePnLAttribution, computeSlippageStats } from '../src/lib/metrics';
-import { Trade } from '../src/types';
+import { calculateGaslessSavings, calculatePnLAttribution, computeSlippageStats } from '../lib/metrics';
+import { Trade } from '../types';
 
 // Mock Trade Helper
 const createTrade = (overrides: Partial<Trade> = {}): Trade => ({

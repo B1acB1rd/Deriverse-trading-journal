@@ -17,7 +17,7 @@ interface TradeContextType {
     deriverseClientId: number | null;
     totalPnl: number;
     totalUnrealizedPnl: number;
-    totalRealizedPnl: number; // NEW
+    totalRealizedPnl: number;
     balances: { name: string; amount: number }[];
     positions: any[];
     openOrders: any[];
@@ -25,11 +25,11 @@ interface TradeContextType {
     assets: { sol: number; usdc: number; deriverse: number };
     totalVolume: number;
     totalFees: number;
-    lpPositions: any[]; // NEW
-    perpStats: any[];   // NEW
-    pnl: { unrealized: number; realized: number; total: number }; // NEW
+    lpPositions: any[];
+    perpStats: any[];
+    pnl: { unrealized: number; realized: number; total: number };
     saveJournalEntry: (tradeId: string, data: Partial<JournalEntry>) => void;
-    // Filtering
+
     dateRange: 'ALL' | '7D' | '30D' | '90D';
     setDateRange: (range: 'ALL' | '7D' | '30D' | '90D') => void;
     allTrades: Trade[];
@@ -56,21 +56,21 @@ function generateSnapshots(trades: Trade[]): VerificationSnapshot[] {
 function calculateUserProfile(trades: Trade[]): TraderProfile | null {
     if (trades.length === 0) return null;
 
-    // Filter for valid closed trades
+
     const closedTrades = trades.filter(t => Math.abs(t.pnl) > 0 || Number(t.realizedPnl) !== 0 || t.status === 'CLOSED');
 
-    // Archetype (Duration based - requires Entry Time in future, fallback to Scalper for now if duration is 0)
+
     const avgDuration = trades.reduce((a, b) => a + b.duration, 0) / (trades.length || 1);
 
-    // Bias
+
     const longTrades = trades.filter(t => t.side === 'LONG').length;
 
-    // Metrics
+
     const winningTrades = closedTrades.filter(t => t.pnl > 0);
     const losingTrades = closedTrades.filter(t => t.pnl <= 0);
     const winRate = closedTrades.length > 0 ? winningTrades.length / closedTrades.length : 0;
 
-    // --- Weakness Analysis ---
+
     let weakness = 'Inconsistency';
     const avgWin = winningTrades.reduce((a, b) => a + b.pnl, 0) / (winningTrades.length || 1);
     const avgLoss = Math.abs(losingTrades.reduce((a, b) => a + b.pnl, 0) / (losingTrades.length || 1));
@@ -85,7 +85,7 @@ function calculateUserProfile(trades: Trade[]): TraderProfile | null {
         weakness = 'Overtrading';
     }
 
-    // --- Best Session Analysis (UTC) ---
+
     const sessions = {
         'Asian (00-08 UTC)': 0,
         'London (08-16 UTC)': 0,
@@ -123,57 +123,15 @@ function calculateUserProfile(trades: Trade[]): TraderProfile | null {
 function mapSide(type: string, side: string): 'LONG' | 'SHORT' {
     const t = type.toLowerCase();
     const s = side.toLowerCase();
-    if (t.includes('fee')) return 'LONG'; // Keep fees as LONG for now or filter later
+    if (t.includes('fee')) return 'LONG';
     if (t.includes('sell') || t.includes('short') || t.includes('bear') || s === 'short') {
         return 'SHORT';
     }
     return 'LONG';
 }
 
-function calculateFifoPnl(trades: Trade[]): Trade[] {
-    const chronological = [...trades].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-    const inventory: Record<string, { price: number, qty: number }[]> = {};
+import { calculateFifoPnl } from '../lib/pnl';
 
-    chronological.forEach(trade => {
-        if (trade.positionType !== 'Spot') return;
-        const sym = trade.symbol;
-        if (!inventory[sym]) inventory[sym] = [];
-
-        const isBuy = trade.side === 'LONG';
-
-        if (isBuy) {
-            inventory[sym].push({ price: trade.price, qty: trade.size });
-        } else {
-            let qtyToSell = trade.size;
-            let realizedPnl = 0;
-
-            while (qtyToSell > 0 && inventory[sym].length > 0) {
-                const batch = inventory[sym][0];
-                const matchedQty = Math.min(qtyToSell, batch.qty);
-                // Precision Fix: Calculate batch PnL
-                const batchPnl = (trade.price - batch.price) * matchedQty;
-                realizedPnl += batchPnl;
-
-                // Precision Fix: Update Quantities - Use simple subtraction, JS numbers have enough precision for this usually (15-17 digits)
-                // If we need more, we'd use a Decimal library, but for now just avoid aggressive rounding.
-                batch.qty = batch.qty - matchedQty;
-                qtyToSell = qtyToSell - matchedQty;
-
-                if (batch.qty <= 0.000000001) { // Epsilon check
-                    inventory[sym].shift();
-                }
-            }
-
-            // Precision Fix: Assign Realized PnL without truncation
-            trade.realizedPnl = realizedPnl;
-            // Accumulate cleanly
-            const currentPnl = trade.pnl || 0;
-            trade.pnl = currentPnl + realizedPnl;
-        }
-    });
-
-    return chronological.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-}
 
 export function TradeProvider({ children }: { children: ReactNode }) {
     const { connection } = useConnection();
@@ -190,15 +148,14 @@ export function TradeProvider({ children }: { children: ReactNode }) {
     const [balances, setBalances] = useState<{ name: string; amount: number }[]>([]);
     const [positions, setPositions] = useState<any[]>([]);
     const [openOrders, setOpenOrders] = useState<any[]>([]);
-    // NEW: LP Positions, Perp Stats, PnL
+
     const [lpPositions, setLpPositions] = useState<any[]>([]);
     const [perpStats, setPerpStats] = useState<any[]>([]);
     const [pnl, setPnl] = useState<{ unrealized: number; realized: number; total: number }>({ unrealized: 0, realized: 0, total: 0 });
     const [totalRealizedPnl, setTotalRealizedPnl] = useState(0);
 
-    // Initialize Journal Hook
-    const { hydrateTrades, saveEntry: saveJournalEntry } = useJournalData(publicKey ? publicKey.toString() : null);
 
+    const { hydrateTrades, saveEntry: saveJournalEntry } = useJournalData(publicKey ? publicKey.toString() : null);
 
 
     const loadData = useCallback(async () => {
@@ -233,10 +190,10 @@ export function TradeProvider({ children }: { children: ReactNode }) {
                 if (data.balance) setBalance(data.balance);
                 if (data.assets) setAssets(data.assets);
 
-                // Open Positions
+
                 if (data.positions) {
                     setPositions(data.positions);
-                    // Calculate Total Unrealized PnL
+
                     const upnl = data.positions.reduce((acc: number, p: any) => acc + (p.pnl || 0), 0);
                     setTotalUnrealizedPnl(upnl);
                 } else {
@@ -244,26 +201,26 @@ export function TradeProvider({ children }: { children: ReactNode }) {
                     setTotalUnrealizedPnl(0);
                 }
 
-                // Open Orders
+
                 if (data.orders) {
                     setOpenOrders(data.orders);
                 } else {
                     setOpenOrders([]);
                 }
 
-                // NEW: LP Positions
+
                 if (data.lpPositions) {
                     setLpPositions(data.lpPositions);
                 } else {
                     setLpPositions([]);
                 }
 
-                // NEW: Perp Stats
+
                 if (data.perpStats) {
                     setPerpStats(data.perpStats);
                 }
 
-                // NEW: PnL data from API
+
                 if (data.pnl) {
                     setPnl(data.pnl);
                     setTotalRealizedPnl(data.pnl.realized || 0);
@@ -324,7 +281,7 @@ export function TradeProvider({ children }: { children: ReactNode }) {
         }
     }, [connection, publicKey, connected, hydrateTrades]);
 
-    // --- Date Filtering Logic ---
+
     const [dateRange, setDateRange] = useState<'ALL' | '7D' | '30D' | '90D'>('ALL');
 
     useEffect(() => {
@@ -346,7 +303,7 @@ export function TradeProvider({ children }: { children: ReactNode }) {
         return trades.filter(t => new Date(t.timestamp) >= cutoff);
     }, [trades, dateRange]);
 
-    // Derived Metrics (Dynamic based on Date Range)
+
     const { dynamicVolume, dynamicFees, dynamicTradeCount } = React.useMemo(() => {
         const vol = filteredTrades.reduce((acc, t) => acc + (t.price * t.size), 0);
         const fees = filteredTrades.reduce((acc, t) => acc + (t.manualFees !== undefined ? Math.abs(t.manualFees) : Math.abs(t.fees || 0)), 0);
@@ -356,8 +313,8 @@ export function TradeProvider({ children }: { children: ReactNode }) {
 
     return (
         <TradeContext.Provider value={{
-            trades: filteredTrades, // Return filtered trades by default
-            allTrades: trades, // Expose raw for "All Time" stats if needed
+            trades: filteredTrades,
+            allTrades: trades,
             dateRange,
             setDateRange,
             snapshots,

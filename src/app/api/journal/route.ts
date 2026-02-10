@@ -3,7 +3,7 @@ import { getDatabase } from '@/lib/mongodb';
 
 export const dynamic = 'force-dynamic';
 
-// Journal Entry interface matching the frontend
+
 interface JournalEntryDocument {
     walletAddress: string;
     tradeId: string;
@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ success: false, error: 'Wallet address required' }, { status: 400 });
     }
 
-    // Check if MongoDB is configured
+
     if (!process.env.MONGODB_URI) {
         return NextResponse.json({ success: true, entries: {}, source: 'none' });
     }
@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
 
         const entries = await collection.find({ walletAddress: wallet }).toArray();
 
-        // Convert to Record format for frontend compatibility
+
         const entriesMap: Record<string, any> = {};
         for (const entry of entries) {
             entriesMap[entry.tradeId] = {
@@ -67,7 +67,7 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ success: true, entries: entriesMap, source: 'mongodb' });
     } catch (error: any) {
         console.warn('[Journal API] MongoDB unavailable, falling back to localStorage-only mode:', error.message);
-        // Gracefully degrade — return empty so the frontend uses localStorage
+
         return NextResponse.json({ success: true, entries: {}, source: 'none' });
     }
 }
@@ -84,9 +84,9 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ success: false, error: 'wallet and tradeId required' }, { status: 400 });
         }
 
-        // Check if MongoDB is configured
+
         if (!process.env.MONGODB_URI) {
-            // Return success but indicate no persistence
+
             return NextResponse.json({ success: true, persisted: false, source: 'none' });
         }
 
@@ -111,7 +111,7 @@ export async function POST(req: NextRequest) {
             updatedAt: new Date()
         };
 
-        // Upsert (insert or update)
+
         await collection.updateOne(
             { walletAddress: wallet, tradeId },
             {
@@ -125,7 +125,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ success: true, persisted: true, source: 'mongodb' });
     } catch (error: any) {
         console.warn('[Journal API] MongoDB save failed, localStorage will be used:', error.message);
-        // Gracefully degrade — entry is still saved in localStorage on the client
+
         return NextResponse.json({ success: true, persisted: false, source: 'none' });
     }
 }

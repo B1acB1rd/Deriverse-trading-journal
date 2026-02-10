@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Plus, Trash2, Edit2, Target } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Plus, Trash2, Edit2, Target, Loader2 } from 'lucide-react';
+import { useTradeData } from '@/hooks/useTradeData';
 
 interface Setup {
     id: string;
@@ -16,20 +17,64 @@ const DEFAULT_SETUPS: Setup[] = [
 ];
 
 export function SetupLibrary() {
-    const [setups, setSetups] = useState<Setup[]>(DEFAULT_SETUPS); // In real app, persist this
+    const { walletAddress } = useTradeData();
+    const [setups, setSetups] = useState<Setup[]>(DEFAULT_SETUPS);
     const [isAdding, setIsAdding] = useState(false);
     const [newSetup, setNewSetup] = useState({ name: '', description: '' });
+    const [isLoading, setIsLoading] = useState(false);
 
-    const handleAdd = () => {
+    const loadStrategies = useCallback(async () => {
+        if (!walletAddress) return;
+        setIsLoading(true);
+        try {
+            const res = await fetch(`/api/strategies?wallet=${walletAddress}`);
+            const data = await res.json();
+            if (data.success && data.strategies.length > 0) {
+                setSetups(data.strategies);
+            }
+        } catch (err) {
+            console.warn('[SetupLibrary] Failed to load strategies:', err);
+        } finally {
+            setIsLoading(false);
+        }
+    }, [walletAddress]);
+
+    useEffect(() => {
+        loadStrategies();
+    }, [loadStrategies]);
+
+    const handleAdd = async () => {
         if (!newSetup.name) return;
-        setSetups([...setups, {
+        const strategy: Setup = {
             id: Date.now().toString(),
             name: newSetup.name,
             description: newSetup.description,
             tags: ['Custom']
-        }]);
+        };
+
+        setSetups(prev => [...prev, strategy]);
         setNewSetup({ name: '', description: '' });
         setIsAdding(false);
+
+        if (walletAddress) {
+            fetch('/api/strategies', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ wallet: walletAddress, strategy })
+            }).catch(err => console.warn('[SetupLibrary] Save failed:', err));
+        }
+    };
+
+    const handleDelete = async (id: string) => {
+        setSetups(prev => prev.filter(s => s.id !== id));
+
+        if (walletAddress) {
+            fetch('/api/strategies', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ wallet: walletAddress, strategyId: id })
+            }).catch(err => console.warn('[SetupLibrary] Delete failed:', err));
+        }
     };
 
     return (
@@ -51,6 +96,12 @@ export function SetupLibrary() {
             </div>
 
             <div className="space-y-4">
+                {isLoading && (
+                    <div className="flex items-center justify-center py-4">
+                        <Loader2 className="w-5 h-5 text-solana-purple animate-spin" />
+                    </div>
+                )}
+
                 {isAdding && (
                     <div className="p-4 bg-white/5 rounded-xl border border-solana-purple/50 animate-fade-in">
                         <input
@@ -85,7 +136,7 @@ export function SetupLibrary() {
                                     <Edit2 className="w-3 h-3" />
                                 </button>
                                 <button
-                                    onClick={() => setSetups(prev => prev.filter(s => s.id !== setup.id))}
+                                    onClick={() => handleDelete(setup.id)}
                                     className="p-1.5 hover:bg-red-500/20 rounded text-white/40 hover:text-red-400"
                                 >
                                     <Trash2 className="w-3 h-3" />

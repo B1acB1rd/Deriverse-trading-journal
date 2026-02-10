@@ -177,4 +177,4 @@ MIT
 
 ---
 
-**Built for the Deriverse Hackathon 2026**
+**Built by B1ACB1RD**

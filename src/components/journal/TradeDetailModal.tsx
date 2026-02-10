@@ -84,16 +84,16 @@ export function TradeDetailModal({ trade, onClose }: TradeDetailModalProps) {
             <motion.div
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
-                className="relative w-full max-w-4xl bg-gray-900/95 border border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+                className="relative w-full max-w-4xl bg-gray-900/95 border border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] mx-2"
             >
                 {/* Header */}
-                <div className="flex items-center justify-between p-6 border-b border-white/5 bg-white/5">
+                <div className="flex items-center justify-between p-4 md:p-6 border-b border-white/5 bg-white/5">
                     <div className="flex items-center gap-4">
                         <div className={`p-3 rounded-xl ${trade.pnl >= 0 ? 'bg-solana-green/20' : 'bg-red-500/20'}`}>
                             {trade.pnl >= 0 ? <TrendingUp className="text-solana-green" /> : <TrendingDown className="text-red-500" />}
                         </div>
                         <div>
-                            <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                            <h2 className="text-base md:text-xl font-bold text-white flex items-center gap-2">
                                 {trade.symbol}
                                 <span className={`text-sm px-2 py-0.5 rounded ${trade.side === 'LONG' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
                                     {trade.side}
@@ -102,10 +102,10 @@ export function TradeDetailModal({ trade, onClose }: TradeDetailModalProps) {
                             <p className="text-sm text-text-muted">{new Date(trade.timestamp).toLocaleString()}</p>
                         </div>
                     </div>
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2 md:gap-4">
                         <div className="text-right">
                             <p className="text-sm text-text-muted">Net PnL</p>
-                            <p className={`text-xl font-mono font-bold ${trade.pnl >= 0 ? 'text-solana-green' : 'text-red-500'}`}>
+                            <p className={`text-lg md:text-xl font-mono font-bold ${trade.pnl >= 0 ? 'text-solana-green' : 'text-red-500'}`}>
                                 {trade.pnl >= 0 ? '+' : ''}${trade.pnl.toFixed(2)}
                             </p>
                         </div>
@@ -116,12 +116,12 @@ export function TradeDetailModal({ trade, onClose }: TradeDetailModalProps) {
                 </div>
 
                 {/* Tabs */}
-                <div className="flex border-b border-white/5">
+                <div className="flex border-b border-white/5 overflow-x-auto scrollbar-hide">
                     {TABS.map(tab => (
                         <button
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id)}
-                            className={`flex items-center gap-2 px-6 py-4 text-sm font-medium transition-colors border-b-2 flex-1 justify-center
+                            className={`flex items-center gap-2 px-4 md:px-6 py-3 md:py-4 text-xs md:text-sm font-medium transition-colors border-b-2 flex-1 justify-center whitespace-nowrap min-w-fit
                                 ${activeTab === tab.id ? 'border-solana-purple text-white bg-white/5' : 'border-transparent text-text-muted hover:text-white hover:bg-white/5'}`}
                         >
                             <tab.icon className="w-4 h-4" />
@@ -131,11 +131,11 @@ export function TradeDetailModal({ trade, onClose }: TradeDetailModalProps) {
                 </div>
 
                 {/* Content */}
-                <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+                <div className="flex-1 overflow-y-auto p-4 md:p-6 custom-scrollbar">
                     {/* EXECUTION TAB */}
                     {activeTab === 'execution' && (
                         <div className="space-y-6">
-                            <div className="grid grid-cols-2 gap-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
                                 <div className="p-4 bg-white/5 rounded-xl border border-white/5">
                                     <h4 className="text-sm text-text-muted mb-4 uppercase tracking-wider">Entry & Exit</h4>
                                     <div className="space-y-4">
@@ -228,7 +228,7 @@ export function TradeDetailModal({ trade, onClose }: TradeDetailModalProps) {
                     {/* STRATEGY TAB */}
                     {activeTab === 'strategy' && (
                         <div className="space-y-6">
-                            <div className="grid grid-cols-2 gap-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
                                 <div>
                                     <label className="block text-sm text-text-muted mb-2">Strategy Name</label>
                                     <select
@@ -415,7 +415,7 @@ export function TradeDetailModal({ trade, onClose }: TradeDetailModalProps) {
                 </div>
 
                 {/* Footer */}
-                <div className="p-6 border-t border-white/5 bg-white/5 flex justify-end gap-3">
+                <div className="p-4 md:p-6 border-t border-white/5 bg-white/5 flex justify-end gap-3">
                     <button onClick={onClose} className="px-6 py-2 rounded-lg text-white/60 hover:text-white transition-colors">
                         Cancel
                     </button>

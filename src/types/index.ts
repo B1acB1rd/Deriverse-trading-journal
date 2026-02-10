@@ -12,6 +12,7 @@ export interface Trade {
     size: number;
     // Financials
     fees: number;
+    feesUsd?: number;
     pnl: number;
     realizedPnl: number;
     unrealizedPnl: number;

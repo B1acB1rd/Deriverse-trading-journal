@@ -22,11 +22,11 @@ interface TraderDNA {
 }
 
 export function TraderDNACard() {
-    const { trades, isLoading, isWalletConnected } = useTradeData();
+    const { trades, isLoading, isWalletConnected, walletAddress } = useTradeData();
     const [dna, setDna] = useState<TraderDNA | null>(null);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
 
-    // Fetch Trader DNA analysis when trades change
+
     useEffect(() => {
         if (!isWalletConnected || !trades || trades.length === 0) {
             setDna(null);
@@ -39,7 +39,7 @@ export function TraderDNACard() {
                 const response = await fetch('/api/trader-dna', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ trades }),
+                    body: JSON.stringify({ trades, wallet: walletAddress }),
                 });
                 const data = await response.json();
                 if (data.success && data.dna) {
@@ -103,7 +103,7 @@ export function TraderDNACard() {
                 </div>
             </div>
 
-            <div className="flex-1 grid grid-cols-2 gap-4 relative z-10">
+            <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 relative z-10">
                 <div className="space-y-4">
                     <div>
                         <p className="text-xs text-text-muted uppercase tracking-wider mb-1">Archetype</p>

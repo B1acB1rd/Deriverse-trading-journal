@@ -99,7 +99,7 @@ Share this snapshot and earn social credibility!`;
                     </div>
 
                     {/* Stats Grid */}
-                    <div className="grid grid-cols-2 gap-3 mb-8">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-8">
                         <div className="p-4 rounded-xl bg-gradient-to-br from-white/5 to-transparent border border-white/5">
                             <div className="text-3xl font-black text-white font-mono tracking-tighter">{stats.totalTrades}</div>
                             <div className="text-[10px] font-bold text-[var(--color-text-muted)] uppercase mt-1">Total Trades</div>

@@ -10,7 +10,7 @@ export default function SettingsPage() {
     const [isSaved, setIsSaved] = useState(false);
 
     const handleSaveRpc = () => {
-        // In a real app, this would update a context or localStorage
+
         localStorage.setItem('deriverse_custom_rpc', rpcEndpoint);
         setIsSaved(true);
         setTimeout(() => setIsSaved(false), 2000);

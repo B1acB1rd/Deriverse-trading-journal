@@ -1,6 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-// Initialize Gemini AI client
+
 const genAI = process.env.GEMINI_API_KEY
     ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
     : null;
@@ -25,7 +25,7 @@ export interface TraderDNAResult {
  * Analyze trader DNA using Gemini AI
  */
 export async function analyzeTraderDNA(trades: any[]): Promise<TraderDNAResult> {
-    // If no Gemini API key or AI fails, use algorithmic fallback
+
     if (!genAI) {
         console.log('[TraderDNA] No Gemini API key, using algorithmic analysis');
         return calculateAlgorithmicDNA(trades);
@@ -34,7 +34,7 @@ export async function analyzeTraderDNA(trades: any[]): Promise<TraderDNAResult> 
     try {
         const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
-        // Prepare trade summary for AI
+
         const tradeSummary = summarizeTradesForAI(trades);
 
         const prompt = `You are an expert trading psychologist. Analyze this trader's performance data and provide insights.
@@ -64,7 +64,7 @@ Respond ONLY with the JSON, no explanation.`;
         const response = await result.response;
         const text = response.text();
 
-        // Parse AI response
+
         const jsonMatch = text.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
             const parsed = JSON.parse(jsonMatch[0]);
@@ -89,7 +89,7 @@ export function calculateAlgorithmicDNA(trades: any[]): TraderDNAResult {
         return getDefaultDNA();
     }
 
-    // Calculate basic metrics
+
     const wins = trades.filter(t => (t.pnl || 0) > 0).length;
     const losses = trades.filter(t => (t.pnl || 0) < 0).length;
     const winRate = trades.length > 0 ? (wins / trades.length) * 100 : 50;
@@ -98,7 +98,7 @@ export function calculateAlgorithmicDNA(trades: any[]): TraderDNAResult {
     const shorts = trades.filter(t => t.side === 'SHORT').length;
     const longRatio = trades.length > 0 ? longs / trades.length : 0.5;
 
-    // Determine archetype based on trade frequency
+
     const avgDurationMs = trades.length > 1
         ? (new Date(trades[0].timestamp).getTime() - new Date(trades[trades.length - 1].timestamp).getTime()) / trades.length
         : 0;
@@ -109,12 +109,12 @@ export function calculateAlgorithmicDNA(trades: any[]): TraderDNAResult {
     else if (avgDurationHours > 24) archetype = 'Swing Trader';
     else if (avgDurationHours > 72) archetype = 'Position Trader';
 
-    // Directional bias
+
     let directionalBias = 'Balanced';
     if (longRatio > 0.65) directionalBias = 'Long Biased';
     else if (longRatio < 0.35) directionalBias = 'Short Biased';
 
-    // Best session (based on profitable trades)
+
     const profitBySession = { asia: 0, london: 0, ny: 0 };
     trades.forEach(t => {
         const hour = new Date(t.timestamp).getUTCHours();
@@ -131,20 +131,20 @@ export function calculateAlgorithmicDNA(trades: any[]): TraderDNAResult {
         bestSession = 'London (07-15 UTC)';
     }
 
-    // Calculate scores
+
     const riskManagement = Math.min(100, Math.max(0, 50 + (wins - losses) * 5));
     const timing = Math.min(100, Math.max(0, winRate));
     const patience = Math.min(100, Math.max(0, 100 - (trades.length / 10) * 10));
     const consistency = Math.min(100, Math.max(0, 50 + (winRate - 50)));
 
-    // Primary weakness
+
     let primaryWeakness = 'Needs more data';
     if (winRate < 40) primaryWeakness = 'Poor Entry Timing (Low Win Rate)';
     else if (losses > wins * 2) primaryWeakness = 'Letting Losses Run';
     else if (patience < 30) primaryWeakness = 'Overtrading';
     else if (riskManagement < 40) primaryWeakness = 'Poor Risk Management';
 
-    // Insight
+
     let insight = 'Focus on your best session times.';
     if (winRate < 40) insight = 'Try forcing a 15m break after losses.';
     else if (patience < 30) insight = 'Quality over quantity - wait for A+ setups.';
@@ -196,7 +196,7 @@ function summarizeTradesForAI(trades: any[]): string {
     const spotTrades = trades.filter(t => t.symbol?.includes('USDC')).length;
     const perpTrades = trades.filter(t => t.symbol?.includes('PERP')).length;
 
-    // Compute average trade size
+
     const avgSize = trades.reduce((sum, t) => sum + (t.size || 0), 0) / trades.length;
 
     return `

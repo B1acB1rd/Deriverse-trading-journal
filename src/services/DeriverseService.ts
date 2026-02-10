@@ -8,7 +8,7 @@ import {
 } from "@solana/kit";
 import { Engine } from '@deriverse/kit';
 
-// Configuration from env
+
 const RPC_ENDPOINT = process.env.NEXT_PUBLIC_RPC_ENDPOINT || 'https://api.devnet.solana.com';
 const PROGRAM_ID = process.env.NEXT_PUBLIC_DERIVERSE_PROGRAM_ID || 'Drvrseg8AQLP8B96DBGmHRjFGviFNYTkHueY9g3k27Gu';
 const VERSION = parseInt(process.env.NEXT_PUBLIC_DERIVERSE_VERSION || '12');
@@ -33,11 +33,11 @@ export interface ActivePosition {
     unrealizedPnl: number;
     leverage?: number;
     clientId?: number;
-    // Raw SDK data
+
     rawData?: any;
 }
 
-// LP/Liquidity Position
+
 export interface LpPosition {
     instrId: number;
     symbol: string;
@@ -45,7 +45,7 @@ export interface LpPosition {
     valuationUsdc: number;
 }
 
-// Perp Open Order
+
 export interface PerpOpenOrder {
     instrId: number;
     orderId: number;
@@ -55,7 +55,7 @@ export interface PerpOpenOrder {
     timestamp?: string;
 }
 
-// Perp Account Stats (from GetClientPerpOrdersInfoResponse)
+
 export interface PerpStats {
     instrId: number;
     position: number;       // perps field
@@ -73,12 +73,12 @@ export interface ClientTradeData {
     clientId: number;
     balances: TokenBalance[];
     activePositions: ActivePosition[];
-    lpPositions: LpPosition[];        // NEW: LP/Liquidity positions
-    perpOpenOrders: PerpOpenOrder[];  // NEW: Open perp orders
-    perpStats: PerpStats[];           // NEW: Perp account statistics
+    lpPositions: LpPosition[];
+    perpOpenOrders: PerpOpenOrder[];
+    perpStats: PerpStats[];
     totalPnl: number;
     totalUnrealizedPnl: number;
-    totalRealizedPnl: number;         // NEW: From perp stats
+    totalRealizedPnl: number;
     equity: number;
 }
 
@@ -91,7 +91,7 @@ export class DeriverseService {
     private currentWallet: string | null = null;
 
     private constructor() {
-        // Initialize RPC with proper endpoint
+
         console.log("DeriverseService: Using RPC endpoint:", RPC_ENDPOINT);
         this.rpc = createSolanaRpc(devnet(RPC_ENDPOINT));
     }
@@ -132,11 +132,11 @@ export class DeriverseService {
         try {
             if (!this.engine) throw new Error("Engine failed to initialize");
 
-            // Set the "signer" context to the user's wallet address
+
             await this.engine.setSigner(address(walletPublicKey));
             this.currentWallet = walletPublicKey;
 
-            // Check if client exists
+
             if (!this.engine.originalClientId) {
                 console.log("No Deriverse account found for wallet:", walletPublicKey);
                 return null;
@@ -144,60 +144,60 @@ export class DeriverseService {
 
             console.log("Found Deriverse Client ID:", this.engine.originalClientId);
 
-            // Fetch client data from SDK
+
             const clientData = await this.engine.getClientData();
 
-            // --- Fetch Token Balances ---
+
             const balances: TokenBalance[] = [];
 
-            // Helper to get balance for a mint
+
             const processBalance = async (mintStr: string | undefined) => {
                 if (!mintStr) return;
                 try {
-                    // Try to get tokenId from the mint
+
                     const tokenId = await this.engine!.getTokenId(address(mintStr));
                     if (tokenId != null && clientData.tokens) {
                         const tokenData = clientData.tokens.get(tokenId);
                         if (tokenData) {
                             balances.push({
                                 mint: mintStr,
-                                amount: Number(tokenData.amount), // This is Quantity (e.g. 5.1 SOL)
+                                amount: Number(tokenData.amount),
                                 tokenId
                             });
                         }
                     }
                 } catch (e) {
-                    // Ignore tokens we can't find
+
                 }
             };
 
             await processBalance(TOKEN_MINT_A);
             await processBalance(TOKEN_MINT_B);
 
-            // --- Fetch Active Positions with Market Data ---
+
             const activePositions: ActivePosition[] = [];
             let totalPnl = 0;
             let totalUnrealizedPnl = 0;
 
-            // Process SPOT positions
+
             if (clientData.spot) {
                 for (const [instrId, position] of clientData.spot.entries()) {
                     try {
-                        // Update instrument data to get current prices
+
                         await this.engine.updateInstrData({ instrId });
                         const instr = this.engine.instruments?.get(instrId);
 
                         if (instr) {
                             const markPrice = instr.header.lastPx || 0;
-                            // Spot uses availAssetTokens and availCrncyTokens
+
                             const assetTokens = Number((position as any).availAssetTokens || 0);
                             const crncyTokens = Number((position as any).availCrncyTokens || 0);
                             const positionSize = assetTokens;
                             const side: 'LONG' | 'SHORT' = positionSize >= 0 ? 'LONG' : 'SHORT';
 
-                            // Calculate position value and entry price
+
                             const currentValue = Math.abs(positionSize) * markPrice;
-                            // Entry price approximated from currency tokens / asset tokens
+
                             const entryPrice = assetTokens > 0 ? crncyTokens / assetTokens : markPrice;
                             const unrealizedPnl = (markPrice - entryPrice) * positionSize;
 
@@ -221,32 +221,29 @@ export class DeriverseService {
                         console.warn(`Failed to fetch instrument data for SPOT ${instrId}:`, instrError);
                     }
                 }
-            } // end if (clientData.spot)
+            }
 
-            // Process PERP positions
+
             if (clientData.perp) {
                 for (const [instrId, position] of clientData.perp.entries()) {
                     try {
-                        // Update instrument data to get current prices
+
                         await this.engine.updateInstrData({ instrId });
                         const instr = this.engine.instruments?.get(instrId);
 
                         if (instr) {
-                            // Perp uses perpLastPx for perpetual positions
+
                             const markPrice = instr.header.perpLastPx || instr.header.lastPx || 0;
-                            // PerpClientInfoModel has: funds, perps, inOrdersFunds, inOrdersPerps
+
                             const perpPosition = position as any;
                             const positionSize = Number(perpPosition.perps || 0);
                             const side: 'LONG' | 'SHORT' = positionSize >= 0 ? 'LONG' : 'SHORT';
                             const funds = Number(perpPosition.funds || 0);
                             const cost = Number(perpPosition.cost || 0);
 
-                            // Calculate PnL for perpetuals
-                            // Notional = position size * current price
+
                             const notional = positionSize * markPrice;
-                            // Entry price (cost basis per unit)
                             const entryPrice = Math.abs(positionSize) > 0 ? Math.abs(cost) / Math.abs(positionSize) : markPrice;
-                            // Unrealized PnL = current value - cost basis
                             const unrealizedPnl = notional - cost;
 
                             activePositions.push({
@@ -270,22 +267,22 @@ export class DeriverseService {
                         console.warn(`Failed to fetch instrument data for PERP ${instrId}:`, instrError);
                     }
                 }
-            } // end if (clientData.perp)
+            }
 
-            totalPnl = totalUnrealizedPnl; // For open positions, total PnL = unrealized PnL
+            totalPnl = totalUnrealizedPnl;
 
-            // --- Fetch LP Positions ---
+
             const lpPositions: LpPosition[] = [];
             if (clientData.lp) {
                 for (const [instrId, lpData] of clientData.lp.entries()) {
                     try {
-                        // Update instrument to get current price for valuation
+
                         await this.engine.updateInstrData({ instrId });
                         const instr = this.engine.instruments?.get(instrId);
                         const markPrice = instr?.header?.lastPx || 0;
                         const lpTokens = Number((lpData as any).amount || 0);
 
-                        // LP valuation approximation (LP tokens * mark price as rough estimate)
+
                         const valuationUsdc = lpTokens * markPrice;
 
                         lpPositions.push({
@@ -300,7 +297,7 @@ export class DeriverseService {
                 }
             }
 
-            // --- Fetch Perp Stats and Open Orders ---
+
             const perpStats: PerpStats[] = [];
             const perpOpenOrders: PerpOpenOrder[] = [];
             let totalRealizedPnl = 0;
@@ -311,17 +308,17 @@ export class DeriverseService {
                         const perpClientId = (perpData as any).clientId;
                         if (perpClientId == null) continue;
 
-                        // Get perp orders info which contains stats
+
                         const perpInfo = await this.engine.getClientPerpOrdersInfo({
                             instrId,
                             clientId: perpClientId
                         });
 
                         if (perpInfo) {
-                            // Extract leverage from mask (first byte)
+
                             const leverage = (perpInfo.mask || 0) & 0xFF || 10;
 
-                            // USDC normalization factor (6 decimals)
+
                             const USDC_DECIMALS = 1_000_000;
 
                             perpStats.push({
@@ -339,7 +336,7 @@ export class DeriverseService {
 
                             totalRealizedPnl += (perpInfo.result || 0) / USDC_DECIMALS;
 
-                            // Fetch open orders if any
+
                             if (perpInfo.bidsCount > 0 || perpInfo.asksCount > 0) {
                                 const orders = await this.engine.getClientPerpOrders({
                                     instrId,
@@ -349,7 +346,7 @@ export class DeriverseService {
                                     asksEntry: perpInfo.asksEntry
                                 });
 
-                                // Process bid orders
+
                                 for (const bid of (orders.bids || [])) {
                                     const o = bid as any;
                                     perpOpenOrders.push({
@@ -361,7 +358,7 @@ export class DeriverseService {
                                     });
                                 }
 
-                                // Process ask orders
+
                                 for (const ask of (orders.asks || [])) {
                                     const o = ask as any;
                                     perpOpenOrders.push({
@@ -380,12 +377,12 @@ export class DeriverseService {
                 }
             }
 
-            // Calculate Equity (Balances Value + Unrealized PnL)
+
             let equity = 0;
 
-            // Need prices for balances
+
             let solPrice = 0;
-            // Try to find price for SOL/USDC
+
             if (this.engine!.instruments) {
                 for (const instr of this.engine!.instruments.values() as any) {
                     if ((instr.symbol && instr.symbol.includes('SOL'))) {
@@ -394,19 +391,19 @@ export class DeriverseService {
                     }
                 }
             }
-            if (solPrice === 0) solPrice = 100; // Fallback to reasonable default if fetch fails
+            if (solPrice === 0) solPrice = 100;
 
             balances.forEach(b => {
-                if (b.tokenId === 1) { // 1 = USDC
+                if (b.tokenId === 1) {
                     equity += b.amount * 1.0;
-                } else if (b.tokenId === 2) { // 2 = SOL
+                } else if (b.tokenId === 2) {
                     equity += b.amount * solPrice;
                 } else {
-                    equity += b.amount * (solPrice * 0.1); // Conservative estimate for unknown
+                    equity += b.amount * (solPrice * 0.1);
                 }
             });
 
-            // Add LP valuation to equity
+
             lpPositions.forEach(lp => {
                 equity += lp.valuationUsdc;
             });
@@ -444,7 +441,7 @@ export class DeriverseService {
         try {
             if (!this.engine) throw new Error("Engine failed to initialize");
 
-            // Ensure signer is set
+
             if (this.currentWallet !== walletPublicKey) {
                 await this.engine.setSigner(address(walletPublicKey));
                 this.currentWallet = walletPublicKey;
@@ -462,7 +459,7 @@ export class DeriverseService {
                 return [];
             }
 
-            // Get order info
+
             const ordersInfo = await this.engine.getClientSpotOrdersInfo({
                 clientId: spotData.clientId,
                 instrId
@@ -472,7 +469,7 @@ export class DeriverseService {
                 return [];
             }
 
-            // Fetch actual orders
+
             const orders = await this.engine.getClientSpotOrders({
                 instrId,
                 bidsCount: ordersInfo.bidsCount,
@@ -543,23 +540,22 @@ export class DeriverseService {
         try {
             if (!this.engine) throw new Error("Engine failed to initialize");
 
-            // 1. Fetch recent signatures
-            // Reduced limit to 10 for faster loading and stability
+
             const signatures = await this.rpc.getSignaturesForAddress(address(walletPublicKey), { limit: 300 }).send();
 
             const trades: any[] = [];
 
-            // 2. Fetch transaction details in batches
+
             const rawSigs = Array.isArray(signatures) ? signatures : (signatures.value || []);
             const filteredSigs = rawSigs.map((s: any) => s.signature);
             const myClientId = this.engine.originalClientId;
 
-            // Reduced logging - only show summary
+
             console.log(`[TradeHistory] Processing ${filteredSigs.length} signatures for wallet ${walletPublicKey.slice(0, 8)}...`);
 
             const txs: any[] = [];
             // Batch process with conservative rate limiting for public Devnet RPC
-            const BATCH_SIZE = 2; // Reduced from 5 to avoid 429 errors
+            const BATCH_SIZE = 2;
             for (let i = 0; i < filteredSigs.length; i += BATCH_SIZE) {
                 const batch = filteredSigs.slice(i, i + BATCH_SIZE);
                 const batchResults = await Promise.all(batch.map(async (sig: string) => {
@@ -569,7 +565,7 @@ export class DeriverseService {
                             commitment: 'confirmed'
                         }).send();
                     } catch (e: any) {
-                        // Retry once after delay if rate limited
+
                         if (e.message?.includes('429') || e.context?.statusCode === 429) {
                             await new Promise(resolve => setTimeout(resolve, 1500));
                             try {
@@ -591,36 +587,33 @@ export class DeriverseService {
                     if (tx) txs.push(tx);
                 });
 
-                // Increased delay to avoid rate limiting (800ms between batches)
+
                 await new Promise(resolve => setTimeout(resolve, 800));
             }
 
-            // console.log(`[TradeHistory] Fetched ${txs.length} transactions`);
 
-            // Ensure instruments are loaded for decoding
+
+
             if (!this.engine.instruments || this.engine.instruments.size === 0) {
                 console.log("Instruments empty or undefined, forcing update...");
                 await this.engine.initialize();
             }
 
-            // Robust helper to safely convert BigInt/BN/String to Number
-            // Handles all edge cases to prevent "Cannot mix BigInt and other types" crash
             const toSafeNumber = (val: any): number => {
                 if (val === undefined || val === null) return 0;
                 if (typeof val === 'number') return isNaN(val) ? 0 : val;
                 if (typeof val === 'bigint') {
-                    // Safely convert BigInt to Number (may lose precision for very large values)
                     try { return Number(val); } catch { return 0; }
                 }
                 if (typeof val === 'string') {
                     const parsed = parseFloat(val);
                     return isNaN(parsed) ? 0 : parsed;
                 }
-                // Handle BN.js or similar objects with toNumber method
+
                 if (val.toNumber && typeof val.toNumber === 'function') {
                     try { return val.toNumber(); } catch { return 0; }
                 }
-                // Handle objects with toString method
+
                 if (val.toString && typeof val.toString === 'function') {
                     try {
                         const parsed = parseFloat(val.toString());
@@ -629,17 +622,17 @@ export class DeriverseService {
                 }
                 return 0;
             };
-            // Alias for backward compatibility
+
             const toNumber = toSafeNumber;
 
-            // 3. Decode logs and Reconstruct Trades
+
             for (const tx of txs) {
                 if (!tx || !tx.meta || !tx.meta.logMessages) {
                     continue;
                 }
 
                 try {
-                    // Safety wrapper for library call
+
                     let logs: any[] = [];
                     try {
                         logs = this.engine.logsDecode(tx.meta.logMessages);
@@ -650,9 +643,9 @@ export class DeriverseService {
                     const sig = tx.transaction?.signatures[0];
                     const timestamp = tx.blockTime ? new Date(Number(tx.blockTime) * 1000).toISOString() : new Date().toISOString();
 
-                    // Removed verbose per-TX logging
 
-                    // Temporary storage for this TX
+
+
                     let myOrder: any = null;
                     let fills: any[] = [];
                     let txFees = 0;
@@ -746,7 +739,7 @@ export class DeriverseService {
                             }
                         }
 
-                        // -- Taker Order (Tag 10) - SPOT --
+                        // -- Taker Order (Tag 10) --
                         if (toNumber(l.tag) === 10 && toNumber(l.clientId) === myClientId) {
                             myOrder = l;
                         }
@@ -827,9 +820,7 @@ export class DeriverseService {
                             }
                         }
 
-                        // -- Order Cancel (Tag 13) - skip, not a trade --
-
-                        // -- PERP TRADE (Tag 18) - This is the main perp order tag --
+                        // -- Perp Trade (Tag 18) --
                         if (toNumber(l.tag) === 18 && toNumber(l.clientId) === myClientId) {
                             try {
                                 const perpSize = toNumber(l.perps || 0);
@@ -843,7 +834,7 @@ export class DeriverseService {
                                         symbol: 'SOL-PERP',
                                         price: perpPrice,
                                         size: Math.abs(perpSize),
-                                        pnl: 0, // PnL calculated separately from perpStats
+                                        pnl: 0,
                                         fee: 0,
                                         timestamp,
                                         status: 'FILLED',
@@ -868,7 +859,7 @@ export class DeriverseService {
                                         symbol: 'SOL-PERP',
                                         price: 0,
                                         size: Math.abs(fundingAmount),
-                                        pnl: fundingAmount, // Funding is realized PnL
+                                        pnl: fundingAmount,
                                         fee: 0,
                                         timestamp,
                                         status: 'COMPLETED',
@@ -881,7 +872,7 @@ export class DeriverseService {
                             }
                         }
 
-                        // -- Debug: Log unknown/unhandled tags for discovery --
+
                         const knownTags = [1, 2, 3, 4, 7, 10, 11, 13, 15, 18, 24];
                         const currentTag = toNumber(l.tag);
                         if (currentTag && !knownTags.includes(currentTag) && toNumber(l.clientId) === myClientId) {
@@ -889,11 +880,11 @@ export class DeriverseService {
                         }
                     }
 
-                    // -- Reconstruct Taker Trade --
+
                     if (myOrder) {
                         try {
                             if (fills.length > 0) {
-                                // Helper to calculate total value safely
+
                                 // console.log(`[Debug] Reducing fills for ${sig}`);
                                 const totalVal = fills.reduce((sum, f) => {
                                     const q = toNumber(f.qty);
@@ -935,7 +926,6 @@ export class DeriverseService {
 
         } catch (error) {
             console.error("Error fetching trade history:", error);
-            // Return empty array instead of crashing
             return [];
         }
     }

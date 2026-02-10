@@ -68,7 +68,7 @@ export function TradeReplaySimulator() {
                     </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="p-4 rounded-lg bg-surface/50 border border-border">
                         <div className="text-xs text-text-muted mb-1">Actual PnL</div>
                         <div className={cn("text-xl font-bold", currentPnL >= 0 ? "text-success" : "text-danger")}>
