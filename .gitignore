@@ -51,3 +51,6 @@ next-env.d.ts
 
 # Debug/Development scripts (not needed for submission)
 /scripts/
+
+# Reference projects (not part of this codebase)
+others own/
