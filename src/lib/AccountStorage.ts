@@ -104,6 +104,20 @@ export async function getLatestTradeTimestamp(walletAddress: string): Promise<Da
 }
 
 /**
+ * Get the latest trade signature for incremental sync.
+ * Returns the blockchain signature of the most recent trade so we can
+ * tell Solana's getSignaturesForAddress to only fetch newer transactions.
+ */
+export async function getLatestTradeSignature(walletAddress: string): Promise<string | null> {
+    const collection = await getTradesCollection();
+
+    const latestTrade = await collection
+        .findOne({ walletAddress }, { sort: { timestamp: -1 }, projection: { signature: 1 } });
+
+    return latestTrade?.signature || null;
+}
+
+/**
  * Calculate and store account statistics
  */
 export async function updateAccountStats(walletAddress: string, perpStats?: any[]): Promise<AccountStatsDocument> {

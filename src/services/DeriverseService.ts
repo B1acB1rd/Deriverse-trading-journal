@@ -530,9 +530,10 @@ export class DeriverseService {
         return this.engine?.instruments || new Map();
     }
     /**
-     * Fetch trade history by parsing transaction logs
+     * Fetch trade history by parsing transaction logs.
+     * @param untilSignature - If provided, only fetch transactions newer than this signature (incremental sync)
      */
-    public async fetchTradeHistory(walletPublicKey: string): Promise<any[]> {
+    public async fetchTradeHistory(walletPublicKey: string, untilSignature?: string): Promise<any[]> {
         if (!this.engine || !this.isInitialized) {
             await this.initialize();
         }
@@ -540,8 +541,13 @@ export class DeriverseService {
         try {
             if (!this.engine) throw new Error("Engine failed to initialize");
 
+            const sigOptions: any = { limit: 300 };
+            if (untilSignature) {
+                sigOptions.until = untilSignature;
+                console.log(`[TradeHistory] Incremental sync: fetching only transactions after ${untilSignature.slice(0, 16)}...`);
+            }
 
-            const signatures = await this.rpc.getSignaturesForAddress(address(walletPublicKey), { limit: 300 }).send();
+            const signatures = await this.rpc.getSignaturesForAddress(address(walletPublicKey), sigOptions).send();
 
             const trades: any[] = [];
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { DeriverseService } from '@/services/DeriverseService';
-import { storeTrades, getTrades, updateAccountStats, getAccountStats } from '@/lib/AccountStorage';
+import { storeTrades, getTrades, updateAccountStats, getAccountStats, getLatestTradeSignature } from '@/lib/AccountStorage';
 import { initializeIndexes } from '@/lib/mongodb';
 
 export const dynamic = 'force-dynamic';
@@ -76,73 +76,85 @@ export async function GET(req: NextRequest) {
 
         let allOrders: any[] = [];
 
-        // MongoDB trade caching: fetch fresh, persist, fall back to cache if chain fails
+        // Incremental trade sync: load cached + fetch only new trades from chain
         let trades: any[] = [];
+
+        const mapCachedToApiFormat = (cachedTrades: any[]) => cachedTrades.map(t => ({
+            id: t.tradeId,
+            type: t.type,
+            side: t.side,
+            symbol: t.symbol,
+            price: t.price,
+            size: t.size,
+            pnl: t.pnl,
+            fee: t.fee,
+            realizedPnl: t.realizedPnl,
+            timestamp: t.timestamp instanceof Date ? t.timestamp.toISOString() : t.timestamp,
+            status: 'COMPLETED',
+            section: t.section,
+            chainTx: t.signature
+        }));
 
         if (process.env.MONGODB_URI) {
             try {
-                // Always try to fetch fresh trades from blockchain
-                const freshTrades = await service.fetchTradeHistory(wallet);
+                // Step 1: Check if we have cached trades and get the latest signature
+                const latestSignature = await getLatestTradeSignature(wallet);
+                const cachedTrades = await getTrades(wallet, { limit: 1000 });
+                const isFirstSync = cachedTrades.length === 0;
 
+                console.log(`[API] ${isFirstSync ? 'First sync' : `Incremental sync (${cachedTrades.length} cached)`} for ${wallet.slice(0, 8)}...`);
+
+                // Step 2: Fetch new trades from blockchain
+                // If we have cached data, only fetch transactions newer than our latest signature
+                // If first sync (or forced refresh), fetch everything
+                let freshTrades: any[] = [];
+                try {
+                    if (isFirstSync || refresh) {
+                        freshTrades = await service.fetchTradeHistory(wallet);
+                        console.log(`[API] Full fetch: ${freshTrades.length} trades from chain`);
+                    } else {
+                        freshTrades = await service.fetchTradeHistory(wallet, latestSignature || undefined);
+                        console.log(`[API] Incremental fetch: ${freshTrades.length} new trades from chain`);
+                    }
+                } catch (fetchError: any) {
+                    console.warn(`[API] Blockchain fetch failed: ${fetchError.message}`);
+                    // Continue with cached data only
+                }
+
+                // Step 3: Persist any new trades to MongoDB
                 if (freshTrades.length > 0) {
-                    // Persist fresh trades to MongoDB for cross-device access
                     try {
                         const storedCount = await storeTrades(wallet, freshTrades);
                         console.log(`[API] Persisted ${storedCount} new trades to MongoDB`);
                     } catch (storeError: any) {
                         console.error(`[API] Failed to persist trades: ${storeError.message}`);
                     }
+                }
+
+                // Step 4: Return the complete trade history
+                if (freshTrades.length > 0 && cachedTrades.length > 0) {
+                    // Merge: fresh trades + cached trades (deduplicated by returning all from DB)
+                    const allCached = await getTrades(wallet, { limit: 1000 });
+                    trades = mapCachedToApiFormat(allCached);
+                    console.log(`[API] Returning ${trades.length} total trades (merged)`);
+                } else if (freshTrades.length > 0) {
+                    // First sync — return fresh trades directly
                     trades = freshTrades;
-                } else {
-                    // No fresh trades from chain — try loading from MongoDB cache
-                    console.log('[API] No fresh trades from chain, loading from MongoDB cache');
-                    const cachedTrades = await getTrades(wallet, { limit: 500 });
-                    if (cachedTrades.length > 0) {
-                        trades = cachedTrades.map(t => ({
-                            id: t.tradeId,
-                            type: t.type,
-                            side: t.side,
-                            symbol: t.symbol,
-                            price: t.price,
-                            size: t.size,
-                            pnl: t.pnl,
-                            fee: t.fee,
-                            realizedPnl: t.realizedPnl,
-                            timestamp: t.timestamp instanceof Date ? t.timestamp.toISOString() : t.timestamp,
-                            status: 'COMPLETED',
-                            section: t.section,
-                            chainTx: t.signature
-                        }));
-                        console.log(`[API] Loaded ${trades.length} cached trades from MongoDB`);
-                    }
+                } else if (cachedTrades.length > 0) {
+                    // No new trades — return cached
+                    trades = mapCachedToApiFormat(cachedTrades);
+                    console.log(`[API] Returning ${trades.length} cached trades (no new from chain)`);
                 }
 
                 // Update account stats
                 await updateAccountStats(wallet, clientData.perpStats);
 
-            } catch (fetchError: any) {
-                // Blockchain fetch failed entirely — fall back to cached trades
-                console.warn(`[API] Blockchain fetch failed: ${fetchError.message}, falling back to MongoDB cache`);
+            } catch (dbError: any) {
+                // MongoDB entirely unavailable — fetch everything from chain
+                console.warn(`[API] MongoDB unavailable: ${dbError.message}, fetching from chain only`);
                 try {
-                    const cachedTrades = await getTrades(wallet, { limit: 500 });
-                    trades = cachedTrades.map(t => ({
-                        id: t.tradeId,
-                        type: t.type,
-                        side: t.side,
-                        symbol: t.symbol,
-                        price: t.price,
-                        size: t.size,
-                        pnl: t.pnl,
-                        fee: t.fee,
-                        realizedPnl: t.realizedPnl,
-                        timestamp: t.timestamp instanceof Date ? t.timestamp.toISOString() : t.timestamp,
-                        status: 'COMPLETED',
-                        section: t.section,
-                        chainTx: t.signature
-                    }));
-                    console.log(`[API] Loaded ${trades.length} cached trades from MongoDB (fallback)`);
-                } catch (cacheError: any) {
-                    console.error(`[API] MongoDB cache fallback also failed: ${cacheError.message}`);
+                    trades = await service.fetchTradeHistory(wallet);
+                } catch {
                     trades = [];
                 }
             }
