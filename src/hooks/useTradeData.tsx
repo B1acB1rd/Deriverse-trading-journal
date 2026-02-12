@@ -171,7 +171,9 @@ export function TradeProvider({ children }: { children: ReactNode }) {
         setIsLoading(true);
         try {
             console.log("Fetching Deriverse data...");
-            const response = await fetch(`/api/deriverse?wallet=${publicKey.toString()}`);
+            const customRpc = typeof window !== 'undefined' ? localStorage.getItem('deriverse_custom_rpc') : null;
+            const rpcParam = customRpc ? `&rpc=${encodeURIComponent(customRpc)}` : '';
+            const response = await fetch(`/api/deriverse?wallet=${publicKey.toString()}${rpcParam}`);
 
 
 

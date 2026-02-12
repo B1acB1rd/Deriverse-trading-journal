@@ -29,6 +29,9 @@ export async function GET(req: NextRequest) {
         }
 
         const service = DeriverseService.getInstance();
+        // Apply custom RPC if provided (optional, does not interfere if absent)
+        const customRpc = searchParams.get('rpc');
+        if (customRpc) service.setCustomRpc(customRpc);
         const clientData = await service.fetchClientData(wallet);
 
         if (!clientData) {

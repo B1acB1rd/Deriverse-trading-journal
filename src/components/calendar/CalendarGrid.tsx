@@ -6,7 +6,6 @@ import { formatCurrency, cn } from '@/lib/utils';
 import { ChevronLeft, ChevronRight, Calculator, X, TrendingUp, TrendingDown } from 'lucide-react';
 import { Trade } from '@/types';
 
-// Helper: Get days in month
 function getDaysInMonth(year: number, month: number) {
     const date = new Date(year, month, 1);
     const days = [];
@@ -17,7 +16,6 @@ function getDaysInMonth(year: number, month: number) {
     return days;
 }
 
-// Components for Modal
 function TradePreview({ trade }: { trade: Trade }) {
     const isWin = (trade.pnl || 0) >= 0;
     return (
@@ -48,12 +46,11 @@ export function CalendarGrid() {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
 
-    // 1. Aggregate Data by Date
     const dailyStats = useMemo(() => {
         const stats: Record<string, { pnl: number, count: number, wins: number, trades: Trade[] }> = {};
 
         trades.forEach(trade => {
-            const dateStr = new Date(trade.timestamp).toLocaleDateString('en-CA'); // YYYY-MM-DD
+            const dateStr = new Date(trade.timestamp).toLocaleDateString('en-CA');
             if (!stats[dateStr]) {
                 stats[dateStr] = { pnl: 0, count: 0, wins: 0, trades: [] };
             }
@@ -66,15 +63,13 @@ export function CalendarGrid() {
         return stats;
     }, [trades]);
 
-    // 2. Generate Grid
     const days = getDaysInMonth(year, month);
     const firstDay = days[0];
-    const startingBlankDays = firstDay.getDay(); // 0 = Sunday
+    const startingBlankDays = firstDay.getDay();
 
     const handlePrevMonth = () => setCurrentDate(new Date(year, month - 1, 1));
     const handleNextMonth = () => setCurrentDate(new Date(year, month + 1, 1));
 
-    // Modal Logic
     const selectedDateStr = selectedDate?.toLocaleDateString('en-CA');
     const selectedStats = selectedDateStr ? dailyStats[selectedDateStr] : null;
 
@@ -89,28 +84,28 @@ export function CalendarGrid() {
     }
 
     return (
-        <div className="glass-panel rounded-xl p-6 relative">
+        <div className="glass-panel rounded-xl p-3 md:p-6 relative">
             {/* Header */}
-            <div className="flex justify-between items-center mb-8">
-                <h2 className="text-2xl font-bold text-text-primary">
+            <div className="flex justify-between items-center mb-4 md:mb-8">
+                <h2 className="text-lg md:text-2xl font-bold text-text-primary">
                     {currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
                 </h2>
-                <div className="flex gap-2">
-                    <button onClick={handlePrevMonth} className="p-2 hover:bg-white/5 rounded-full transition"><ChevronLeft /></button>
-                    <button onClick={handleNextMonth} className="p-2 hover:bg-white/5 rounded-full transition"><ChevronRight /></button>
+                <div className="flex gap-1 md:gap-2">
+                    <button onClick={handlePrevMonth} className="p-1.5 md:p-2 hover:bg-white/5 rounded-full transition"><ChevronLeft size={18} /></button>
+                    <button onClick={handleNextMonth} className="p-1.5 md:p-2 hover:bg-white/5 rounded-full transition"><ChevronRight size={18} /></button>
                 </div>
             </div>
 
-            {/* Grid Header (Days) */}
-            <div className="grid grid-cols-7 gap-4 mb-4 text-center text-text-muted text-xs font-bold uppercase tracking-wider">
+            {/* Day Headers */}
+            <div className="grid grid-cols-7 gap-1 md:gap-3 mb-2 md:mb-4 text-center text-text-muted text-[10px] md:text-xs font-bold uppercase tracking-wider">
                 {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => <div key={d}>{d}</div>)}
             </div>
 
             {/* Grid Body */}
-            <div className="grid grid-cols-7 gap-4 min-h-[500px]">
+            <div className="grid grid-cols-7 gap-1 md:gap-3">
                 {/* Blanks */}
                 {Array.from({ length: startingBlankDays }).map((_, i) => (
-                    <div key={`blank-${i}`} className="h-32 bg-transparent rounded-lg" />
+                    <div key={`blank-${i}`} className="aspect-square md:h-28 bg-transparent rounded-lg" />
                 ))}
 
                 {/* Days */}
@@ -121,7 +116,6 @@ export function CalendarGrid() {
                     const count = stats?.count || 0;
                     const isToday = dateStr === new Date().toLocaleDateString('en-CA');
 
-                    // Color Logic
                     let bgClass = "bg-white/5 hover:bg-white/10";
                     let textClass = "text-text-muted";
 
@@ -147,33 +141,32 @@ export function CalendarGrid() {
                             key={dateStr}
                             onClick={() => stats && count > 0 && setSelectedDate(date)}
                             className={cn(
-                                "h-32 rounded-lg p-3 flex flex-col justify-between transition-all cursor-pointer relative overflow-hidden group",
+                                "aspect-square md:h-28 rounded-lg p-1.5 md:p-3 flex flex-col justify-between transition-all cursor-pointer relative overflow-hidden group",
                                 bgClass
                             )}
                         >
                             <div className="flex justify-between items-start">
-                                <span className={cn("text-xs font-bold", isToday ? "text-brand-accent bg-brand-primary/20 px-1.5 py-0.5 rounded" : "text-text-muted")}>
+                                <span className={cn("text-[10px] md:text-xs font-bold", isToday ? "text-brand-accent bg-brand-primary/20 px-1 py-0.5 rounded" : "text-text-muted")}>
                                     {date.getDate()}
                                 </span>
                                 {count > 0 && (
-                                    <span className="text-[10px] text-text-muted bg-black/20 px-1.5 py-0.5 rounded-full">
-                                        {count} T
+                                    <span className="text-[8px] md:text-[10px] text-text-muted bg-black/20 px-1 md:px-1.5 py-0.5 rounded-full">
+                                        {count}
                                     </span>
                                 )}
                             </div>
 
                             {stats && (
                                 <div className="text-right">
-                                    <div className={cn("text-sm font-bold font-mono tracking-tight", textClass)}>
+                                    <div className={cn("text-[9px] md:text-sm font-bold font-mono tracking-tight leading-tight", textClass)}>
                                         {formatCurrency(pnl)}
                                     </div>
-                                    <div className="text-[10px] text-text-muted opacity-70">
+                                    <div className="text-[7px] md:text-[10px] text-text-muted opacity-70 hidden md:block">
                                         {stats.wins}W / {count - stats.wins}L
                                     </div>
                                 </div>
                             )}
 
-                            {/* Hover Effect */}
                             <div className="absolute inset-0 bg-white/0 group-hover:bg-white/5 transition-colors pointer-events-none" />
                         </div>
                     );
@@ -182,14 +175,14 @@ export function CalendarGrid() {
 
             {/* Detail Modal */}
             {selectedDate && selectedStats && (
-                <div className="absolute inset-0 z-10 flex items-center justify-center p-4">
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
                     <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setSelectedDate(null)} />
-                    <div className="bg-[#0b0c15] border border-white/10 w-full max-w-md rounded-xl shadow-2xl relative z-20 animate-in fade-in zoom-in-95 duration-200">
+                    <div className="bg-[#0b0c15] border border-white/10 w-full max-w-md rounded-xl shadow-2xl relative z-20 animate-in fade-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col">
                         {/* Modal Header */}
-                        <div className="p-6 border-b border-white/5 flex justify-between items-center bg-white/5 rounded-t-xl">
+                        <div className="p-4 md:p-6 border-b border-white/5 flex justify-between items-center bg-white/5 rounded-t-xl shrink-0">
                             <div>
-                                <h3 className="text-xl font-bold text-text-primary">
-                                    {selectedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+                                <h3 className="text-lg md:text-xl font-bold text-text-primary">
+                                    {selectedDate.toLocaleDateString('en-US', { weekday: 'short', month: 'long', day: 'numeric' })}
                                 </h3>
                                 <p className={`text-sm font-mono font-bold ${selectedStats.pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                                     Day PnL: {formatCurrency(selectedStats.pnl)}
@@ -201,8 +194,8 @@ export function CalendarGrid() {
                         </div>
 
                         {/* Modal Body */}
-                        <div className="p-6 max-h-[400px] overflow-y-auto">
-                            <div className="grid grid-cols-2 gap-4 mb-6">
+                        <div className="p-4 md:p-6 overflow-y-auto flex-1">
+                            <div className="grid grid-cols-2 gap-3 md:gap-4 mb-6">
                                 <div className="bg-white/5 p-3 rounded-lg text-center">
                                     <div className="text-xs text-text-muted">Trades</div>
                                     <div className="text-lg font-bold text-text-primary">{selectedStats.count}</div>
