@@ -17,6 +17,11 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ success: false, error: 'Wallet address required' }, { status: 400 });
     }
 
+    // Security: validate wallet is a real Solana address (base58, 32-44 chars)
+    if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(wallet)) {
+        return NextResponse.json({ success: false, error: 'Invalid wallet address' }, { status: 400 });
+    }
+
     try {
 
         if (!indexesInitialized && process.env.MONGODB_URI) {

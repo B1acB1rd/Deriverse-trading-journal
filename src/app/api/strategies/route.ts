@@ -3,10 +3,15 @@ import { getDatabase } from '@/lib/mongodb';
 
 export const dynamic = 'force-dynamic';
 
+// Validate Solana wallet address (base58, 32-44 chars)
+function isValidWallet(address: string): boolean {
+    return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(address);
+}
+
 export async function GET(req: NextRequest) {
     const wallet = req.nextUrl.searchParams.get('wallet');
-    if (!wallet) {
-        return NextResponse.json({ success: false, error: 'Wallet address required' }, { status: 400 });
+    if (!wallet || !isValidWallet(wallet)) {
+        return NextResponse.json({ success: false, error: 'Valid wallet address required' }, { status: 400 });
     }
 
     try {
@@ -25,6 +30,9 @@ export async function POST(req: NextRequest) {
         const { wallet, strategy } = await req.json();
         if (!wallet || !strategy) {
             return NextResponse.json({ success: false, error: 'Wallet and strategy required' }, { status: 400 });
+        }
+        if (!isValidWallet(wallet)) {
+            return NextResponse.json({ success: false, error: 'Invalid wallet address' }, { status: 400 });
         }
 
         const db = await getDatabase();
@@ -51,6 +59,9 @@ export async function DELETE(req: NextRequest) {
         if (!wallet || !strategyId) {
             return NextResponse.json({ success: false, error: 'Wallet and strategyId required' }, { status: 400 });
         }
+        if (!isValidWallet(wallet)) {
+            return NextResponse.json({ success: false, error: 'Invalid wallet address' }, { status: 400 });
+        }
 
         const db = await getDatabase();
         await db.collection('strategies').updateOne(
@@ -64,3 +75,4 @@ export async function DELETE(req: NextRequest) {
         return NextResponse.json({ success: true, persisted: false });
     }
 }
+

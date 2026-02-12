@@ -98,16 +98,26 @@ export async function getAccountStatsCollection(): Promise<Collection<AccountSta
  * Initialize MongoDB indexes
  */
 export async function initializeIndexes(): Promise<void> {
+    const database = await getDatabase();
     const trades = await getTradesCollection();
     const stats = await getAccountStatsCollection();
+    const journal = database.collection('journal_entries');
 
-    // Create indexes for trades
+    // Create indexes for trades (data isolation by walletAddress)
     await trades.createIndex({ walletAddress: 1, timestamp: -1 });
     await trades.createIndex({ walletAddress: 1, tradeId: 1 }, { unique: true });
     await trades.createIndex({ signature: 1 });
 
     // Create indexes for account stats
     await stats.createIndex({ walletAddress: 1 }, { unique: true });
+
+    // Create indexes for journal entries (data isolation by walletAddress)
+    await journal.createIndex({ walletAddress: 1, tradeId: 1 }, { unique: true });
+    await journal.createIndex({ walletAddress: 1 });
+
+    // Create indexes for trader_dna cache
+    const traderDna = database.collection('trader_dna');
+    await traderDna.createIndex({ walletAddress: 1 }, { unique: true });
 
     console.log('[MongoDB] Indexes initialized');
 }
