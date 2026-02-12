@@ -103,6 +103,23 @@ export class DeriverseService {
         return DeriverseService.instance;
     }
 
+    /**
+     * Optionally override the RPC endpoint with a custom one.
+     * If customUrl is falsy, keeps using the default endpoint.
+     * Only reinitializes if the endpoint actually changed.
+     */
+    public setCustomRpc(customUrl?: string | null): void {
+        if (!customUrl) return; // No custom RPC — keep using default
+
+        const currentEndpoint = RPC_ENDPOINT;
+        if (customUrl === currentEndpoint) return; // Already using this endpoint
+
+        console.log('[DeriverseService] Switching to custom RPC:', customUrl);
+        this.rpc = createSolanaRpc(devnet(customUrl));
+        this.engine = null;
+        this.isInitialized = false;
+    }
+
     public async initialize(): Promise<void> {
         if (this.isInitialized) return;
 

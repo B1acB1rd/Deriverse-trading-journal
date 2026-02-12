@@ -20,7 +20,7 @@ export async function storeTrades(walletAddress: string, trades: any[]): Promise
                 continue;
             }
 
-            const tradeDoc: TradeDocument = {
+            const tradeData = {
                 walletAddress,
                 tradeId: trade.id,
                 type: trade.type || trade.section || 'Unknown',
@@ -34,14 +34,12 @@ export async function storeTrades(walletAddress: string, trades: any[]): Promise
                 timestamp: new Date(trade.timestamp || Date.now()),
                 signature: trade.chainTx || trade.id.split('-')[1] || trade.id,
                 section: trade.section || trade.type || 'Unknown',
-                createdAt: new Date(),
-                updatedAt: new Date()
             };
 
             const result = await collection.updateOne(
                 { walletAddress, tradeId: trade.id },
                 {
-                    $setOnInsert: tradeDoc,
+                    $setOnInsert: { ...tradeData, createdAt: new Date() },
                     $set: { updatedAt: new Date() }
                 },
                 { upsert: true }
