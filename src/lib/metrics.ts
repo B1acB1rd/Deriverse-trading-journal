@@ -1,4 +1,4 @@
-import { Trade, PnLAttribution } from '@/types';
+import { Trade, PnLAttribution, SymbolMetrics, SessionMetrics, HourlyMetrics, FeeBreakdown } from '@/types';
 
 // ── Basic Metrics ──
 
@@ -277,4 +277,153 @@ export function calculatePerformanceTrend(trades: Trade[]): {
     }
 
     return { trend, recentWinRate, previousWinRate, recentAvgPnl, previousAvgPnl };
+}
+
+// ── Per-Symbol Metrics ──
+
+/**
+ * Breakdown of PnL, volume, win rate, and fees per trading symbol.
+ * Similar to the reference project's calculateSymbolMetrics but uses our Trade type.
+ */
+export function calculateSymbolMetrics(trades: Trade[]): SymbolMetrics[] {
+    const symbolData = new Map<string, {
+        pnl: number; volume: number; fees: number; wins: number; total: number;
+    }>();
+
+    for (const trade of trades) {
+        const existing = symbolData.get(trade.symbol);
+        const volume = (trade.price || 0) * (trade.size || 0);
+        const pnl = trade.pnl || 0;
+        const isWin = pnl > 0;
+        const fee = Math.abs(trade.fees || 0);
+
+        if (existing) {
+            existing.pnl += pnl;
+            existing.volume += volume;
+            existing.fees += fee;
+            existing.total += 1;
+            if (isWin) existing.wins += 1;
+        } else {
+            symbolData.set(trade.symbol, {
+                pnl,
+                volume,
+                fees: fee,
+                wins: isWin ? 1 : 0,
+                total: 1,
+            });
+        }
+    }
+
+    return Array.from(symbolData.entries())
+        .map(([symbol, data]) => ({
+            symbol,
+            pnl: data.pnl,
+            volume: data.volume,
+            tradeCount: data.total,
+            winRate: data.total > 0 ? (data.wins / data.total) * 100 : 0,
+            averagePnl: data.total > 0 ? data.pnl / data.total : 0,
+            fees: data.fees,
+        }))
+        .sort((a, b) => b.volume - a.volume);
+}
+
+// ── Session Metrics ──
+
+/**
+ * Performance broken down by trading session:
+ *   Asian:    00:00 – 08:00 UTC
+ *   European: 08:00 – 16:00 UTC
+ *   American: 16:00 – 24:00 UTC
+ */
+export function calculateSessionMetrics(trades: Trade[]): SessionMetrics[] {
+    const sessions: Record<string, { pnl: number; wins: number; total: number }> = {
+        Asian: { pnl: 0, wins: 0, total: 0 },
+        European: { pnl: 0, wins: 0, total: 0 },
+        American: { pnl: 0, wins: 0, total: 0 },
+    };
+
+    for (const trade of trades) {
+        const hour = new Date(trade.timestamp).getUTCHours();
+        let session: string;
+
+        if (hour >= 0 && hour < 8) session = 'Asian';
+        else if (hour >= 8 && hour < 16) session = 'European';
+        else session = 'American';
+
+        const pnl = trade.pnl || 0;
+        sessions[session].pnl += pnl;
+        sessions[session].total += 1;
+        if (pnl > 0) sessions[session].wins += 1;
+    }
+
+    return (Object.entries(sessions) as [string, { pnl: number; wins: number; total: number }][]).map(
+        ([session, data]) => ({
+            session: session as 'Asian' | 'European' | 'American',
+            pnl: data.pnl,
+            tradeCount: data.total,
+            winRate: data.total > 0 ? (data.wins / data.total) * 100 : 0,
+        })
+    );
+}
+
+// ── Hourly Metrics ──
+
+/**
+ * PnL and win rate broken down by hour of day (0-23 UTC).
+ * Useful for identifying the best/worst hours to trade.
+ */
+export function calculateHourlyMetrics(trades: Trade[]): HourlyMetrics[] {
+    const hourlyData: { pnl: number; wins: number; total: number }[] =
+        Array.from({ length: 24 }, () => ({ pnl: 0, wins: 0, total: 0 }));
+
+    for (const trade of trades) {
+        const hour = new Date(trade.timestamp).getUTCHours();
+        const pnl = trade.pnl || 0;
+        hourlyData[hour].pnl += pnl;
+        hourlyData[hour].total += 1;
+        if (pnl > 0) hourlyData[hour].wins += 1;
+    }
+
+    return hourlyData.map((data, hour) => ({
+        hour,
+        pnl: data.pnl,
+        tradeCount: data.total,
+        winRate: data.total > 0 ? (data.wins / data.total) * 100 : 0,
+    }));
+}
+
+// ── Fee Breakdown ──
+
+/**
+ * Categorize total fees by type (maker rebates, taker fees, funding fees).
+ * Uses trade.fees as taker, trade.feesUsd as total, and checks positionType for funding.
+ */
+export function calculateFeeBreakdown(trades: Trade[]): FeeBreakdown {
+    let makerFees = 0;
+    let takerFees = 0;
+    let fundingFees = 0;
+
+    for (const trade of trades) {
+        const pt = (trade.positionType || '').toLowerCase();
+        const fee = Math.abs(trade.fees || 0);
+
+        if (pt === 'funding') {
+            fundingFees += fee;
+        } else {
+            // For spot/perp, fees are taker by default on Deriverse DEX
+            // Maker rebates show as negative fees from Tag 15
+            if (fee < 0) {
+                makerFees += fee; // rebate (negative)
+            } else {
+                takerFees += fee;
+            }
+        }
+    }
+
+    return {
+        makerFees,
+        takerFees,
+        fundingFees,
+        totalFees: makerFees + takerFees + fundingFees,
+    };
 }

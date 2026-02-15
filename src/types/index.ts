@@ -79,3 +79,42 @@ export interface PnLAttribution {
     slippageLoss: number;
     netPnL: number;
 }
+
+// ── Per-Symbol Analytics ──
+
+export interface SymbolMetrics {
+    symbol: string;
+    pnl: number;
+    volume: number;
+    tradeCount: number;
+    winRate: number;
+    averagePnl: number;
+    fees: number;
+}
+
+// ── Session Analytics ──
+
+export interface SessionMetrics {
+    session: 'Asian' | 'European' | 'American';
+    pnl: number;
+    tradeCount: number;
+    winRate: number;
+}
+
+// ── Hourly Analytics ──
+
+export interface HourlyMetrics {
+    hour: number;
+    pnl: number;
+    tradeCount: number;
+    winRate: number;
+}
+
+// ── Fee Breakdown ──
+
+export interface FeeBreakdown {
+    makerFees: number;
+    takerFees: number;
+    fundingFees: number;
+    totalFees: number;
+}

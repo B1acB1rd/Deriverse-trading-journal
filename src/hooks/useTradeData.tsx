@@ -228,36 +228,49 @@ export function TradeProvider({ children }: { children: ReactNode }) {
                     setTotalRealizedPnl(data.pnl.realized || 0);
                 }
 
-                const rawTrades: Trade[] = (data.trades || []).map((trade: any, index: number) => {
-                    let orderType: 'MARKET' | 'LIMIT' = 'MARKET';
-                    if (trade.type.includes('Order') || trade.type.includes('Bid') || trade.type.includes('Ask')) {
-                        orderType = 'LIMIT';
-                    }
-                    const side = mapSide(trade.type, trade.side);
-                    return {
-                        id: trade.id || `trade-${index}`,
-                        wallet: publicKey.toString(),
-                        symbol: trade.symbol || 'SOL/USDC',
-                        side,
-                        orderType,
-                        price: trade.price || 0,
-                        size: trade.size || trade.quantity || 0,
-                        fees: trade.fee || 0,
-                        pnl: trade.pnl || 0,
-                        realizedPnl: 0,
-                        unrealizedPnl: 0,
-                        slippage: 0,
-                        timestamp: trade.timestamp || new Date().toISOString(),
-                        isOnChain: true,
-                        chainTx: trade.signature,
-                        liquidityTier: 'HIGH' as const,
-                        duration: 0,
-                        isMEVSuspect: false,
-                        status: 'CLOSED' as const,
-                        markPrice: trade.price,
-                        positionType: trade.section
-                    };
-                });
+                const rawTrades: Trade[] = (data.trades || [])
+                    .filter((trade: any) => {
+                        // Only include actual fills and funding, not deposits/withdrawals/margin transfers
+                        // Layer 1: Exclude by type name
+                        const type = (trade.type || '').toLowerCase();
+                        if (type.includes('deposit') || type.includes('withdraw')) return false;
+                        // Layer 2: Exclude by section
+                        const section = (trade.section || '').toLowerCase();
+                        const isValidSection = section === 'spot' || section === 'perp' || section === 'funding';
+                        // Layer 3: Require price > 0 (deposits have price 0, funding is exempt)
+                        const hasPrice = (trade.price || 0) > 0;
+                        return isValidSection && (hasPrice || section === 'funding');
+                    })
+                    .map((trade: any, index: number) => {
+                        let orderType: 'MARKET' | 'LIMIT' = 'MARKET';
+                        if (trade.type.includes('Order') || trade.type.includes('Bid') || trade.type.includes('Ask')) {
+                            orderType = 'LIMIT';
+                        }
+                        const side = mapSide(trade.type, trade.side);
+                        return {
+                            id: trade.id || `trade-${index}`,
+                            wallet: publicKey.toString(),
+                            symbol: trade.symbol || 'SOL/USDC',
+                            side,
+                            orderType,
+                            price: trade.price || 0,
+                            size: trade.size || trade.quantity || 0,
+                            fees: trade.fee || 0,
+                            pnl: trade.pnl || 0,
+                            realizedPnl: 0,
+                            unrealizedPnl: 0,
+                            slippage: 0,
+                            timestamp: trade.timestamp || new Date().toISOString(),
+                            isOnChain: true,
+                            chainTx: trade.signature,
+                            liquidityTier: 'HIGH' as const,
+                            duration: 0,
+                            isMEVSuspect: false,
+                            status: 'CLOSED' as const,
+                            markPrice: trade.price,
+                            positionType: trade.section
+                        };
+                    });
 
                 const enrichedTrades = calculateFifoPnl(rawTrades);
                 const hydratedTrades = hydrateTrades(enrichedTrades);

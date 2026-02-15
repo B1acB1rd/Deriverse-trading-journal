@@ -785,7 +785,7 @@ export class DeriverseService {
                                     fee: 0,
                                     timestamp,
                                     status: 'COMPLETED',
-                                    section: 'Perp',
+                                    section: 'Perp Deposit',
                                     chainTx: sig
                                 });
                             } catch (err: any) {
@@ -807,7 +807,7 @@ export class DeriverseService {
                                     fee: 0,
                                     timestamp,
                                     status: 'COMPLETED',
-                                    section: 'Perp',
+                                    section: 'Perp Withdraw',
                                     chainTx: sig
                                 });
                             } catch (err: any) {

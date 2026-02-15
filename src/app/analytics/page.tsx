@@ -5,6 +5,10 @@ import { PnLAttributionChart } from '@/components/analytics/PnLAttributionChart'
 import { PsychologyChart } from '@/components/analytics/PsychologyChart';
 import { OrderTypePerformance } from '@/components/analytics/OrderTypePerformance';
 import { DrawdownChart } from '@/components/analytics/DrawdownChart';
+import { SymbolBreakdown } from '@/components/analytics/SymbolBreakdown';
+import { SessionPerformance } from '@/components/analytics/SessionPerformance';
+import { HourlyHeatmap } from '@/components/analytics/HourlyHeatmap';
+import { FeeBreakdownChart } from '@/components/analytics/FeeBreakdownChart';
 import { DateRangeFilter } from '@/components/common/DateRangeFilter';
 import { useTradeData } from '@/hooks/useTradeData';
 import {
@@ -17,8 +21,9 @@ import {
     detectStreaks,
     calculatePerformanceTrend
 } from '@/lib/metrics';
+import { exportTradesToCSV } from '@/lib/export';
 import { formatCurrency } from '@/lib/utils';
-import { TrendingUp, TrendingDown, AlertTriangle, Activity, Target, BarChart3, Minus } from 'lucide-react';
+import { TrendingUp, TrendingDown, AlertTriangle, Activity, Target, BarChart3, Minus, Download } from 'lucide-react';
 
 function MetricCard({ label, value, subtitle, icon: Icon, color = 'text-white' }: {
     label: string; value: string; subtitle?: string; icon: any; color?: string;
@@ -66,7 +71,16 @@ export default function AnalyticsPage() {
                     <h2 className="text-xl md:text-2xl font-bold text-text-primary">Advanced Analytics</h2>
                     <p className="text-sm text-text-muted">Deep dive into your performance drivers.</p>
                 </div>
-                <DateRangeFilter />
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={() => exportTradesToCSV(trades)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-text-secondary bg-white/5 hover:bg-white/10 border border-glass-border rounded-lg transition-colors"
+                    >
+                        <Download className="w-3.5 h-3.5" />
+                        Export CSV
+                    </button>
+                    <DateRangeFilter />
+                </div>
             </div>
 
             {/* Quant Metrics Grid */}
@@ -166,6 +180,18 @@ export default function AnalyticsPage() {
                     </div>
                 </div>
             )}
+
+            {/* Per-Symbol Table */}
+            <SymbolBreakdown />
+
+            {/* Session & Fee Charts */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+                <SessionPerformance />
+                <FeeBreakdownChart />
+            </div>
+
+            {/* Hourly Heatmap */}
+            <HourlyHeatmap />
 
             {/* Existing Charts */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
