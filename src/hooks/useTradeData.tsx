@@ -32,6 +32,12 @@ interface TradeContextType {
 
     dateRange: 'ALL' | '7D' | '30D' | '90D';
     setDateRange: (range: 'ALL' | '7D' | '30D' | '90D') => void;
+    symbolFilter: string;
+    setSymbolFilter: (symbol: string) => void;
+    sideFilter: 'ALL' | 'LONG' | 'SHORT';
+    setSideFilter: (side: 'ALL' | 'LONG' | 'SHORT') => void;
+    marketTypeFilter: 'ALL' | 'spot' | 'perpetual';
+    setMarketTypeFilter: (mt: 'ALL' | 'spot' | 'perpetual') => void;
     allTrades: Trade[];
 }
 
@@ -298,6 +304,9 @@ export function TradeProvider({ children }: { children: ReactNode }) {
 
 
     const [dateRange, setDateRange] = useState<'ALL' | '7D' | '30D' | '90D'>('ALL');
+    const [symbolFilter, setSymbolFilter] = useState<string>('ALL');
+    const [sideFilter, setSideFilter] = useState<'ALL' | 'LONG' | 'SHORT'>('ALL');
+    const [marketTypeFilter, setMarketTypeFilter] = useState<'ALL' | 'spot' | 'perpetual'>('ALL');
 
     useEffect(() => {
         const timeout = setTimeout(() => {
@@ -307,16 +316,35 @@ export function TradeProvider({ children }: { children: ReactNode }) {
     }, [loadData]);
 
     const filteredTrades = React.useMemo(() => {
-        if (dateRange === 'ALL') return trades;
-        const now = new Date();
-        const cutoff = new Date();
+        let result = trades;
 
-        if (dateRange === '7D') cutoff.setDate(now.getDate() - 7);
-        if (dateRange === '30D') cutoff.setDate(now.getDate() - 30);
-        if (dateRange === '90D') cutoff.setDate(now.getDate() - 90);
+        // Date range filter
+        if (dateRange !== 'ALL') {
+            const now = new Date();
+            const cutoff = new Date();
+            if (dateRange === '7D') cutoff.setDate(now.getDate() - 7);
+            if (dateRange === '30D') cutoff.setDate(now.getDate() - 30);
+            if (dateRange === '90D') cutoff.setDate(now.getDate() - 90);
+            result = result.filter(t => new Date(t.timestamp) >= cutoff);
+        }
 
-        return trades.filter(t => new Date(t.timestamp) >= cutoff);
-    }, [trades, dateRange]);
+        // Symbol filter
+        if (symbolFilter !== 'ALL') {
+            result = result.filter(t => t.symbol === symbolFilter);
+        }
+
+        // Side filter
+        if (sideFilter !== 'ALL') {
+            result = result.filter(t => t.side === sideFilter);
+        }
+
+        // Market type filter
+        if (marketTypeFilter !== 'ALL') {
+            result = result.filter(t => t.marketType === marketTypeFilter);
+        }
+
+        return result;
+    }, [trades, dateRange, symbolFilter, sideFilter, marketTypeFilter]);
 
 
     const { dynamicVolume, dynamicFees, dynamicTradeCount } = React.useMemo(() => {
@@ -332,6 +360,12 @@ export function TradeProvider({ children }: { children: ReactNode }) {
             allTrades: trades,
             dateRange,
             setDateRange,
+            symbolFilter,
+            setSymbolFilter,
+            sideFilter,
+            setSideFilter,
+            marketTypeFilter,
+            setMarketTypeFilter,
             snapshots,
             profile,
             isLoading,

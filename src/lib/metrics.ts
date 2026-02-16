@@ -1,4 +1,4 @@
-import { Trade, PnLAttribution, SymbolMetrics, SessionMetrics, HourlyMetrics, FeeBreakdown } from '@/types';
+import { Trade, PnLAttribution, SymbolMetrics, SessionMetrics, HourlyMetrics, FeeBreakdown, PortfolioMetrics, DailyPerformance } from '@/types';
 
 // ── Basic Metrics ──
 
@@ -402,8 +402,13 @@ export function calculateFeeBreakdown(trades: Trade[]): FeeBreakdown {
     let makerFees = 0;
     let takerFees = 0;
     let fundingFees = 0;
+    const feesOverTime: { date: Date; fees: number; cumulativeFees: number }[] = [];
 
-    for (const trade of trades) {
+    // Sort trades by timestamp for cumulative calculation
+    const sortedTrades = [...trades].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+    let cumulativeFees = 0;
+
+    for (const trade of sortedTrades) {
         const pt = (trade.positionType || '').toLowerCase();
         const fee = Math.abs(trade.fees || 0);
 
@@ -412,18 +417,208 @@ export function calculateFeeBreakdown(trades: Trade[]): FeeBreakdown {
         } else {
             // For spot/perp, fees are taker by default on Deriverse DEX
             // Maker rebates show as negative fees from Tag 15
-            if (fee < 0) {
-                makerFees += fee; // rebate (negative)
+            if ((trade.fees || 0) < 0) {
+                makerFees += Math.abs(trade.fees || 0); // rebate (negative)
             } else {
                 takerFees += fee;
             }
         }
+
+        cumulativeFees += fee;
+        feesOverTime.push({
+            date: new Date(trade.timestamp),
+            fees: fee,
+            cumulativeFees
+        });
     }
 
     return {
         makerFees,
-        takerFees,
+        takerFees, // Includes taker fees and other costs
         fundingFees,
         totalFees: makerFees + takerFees + fundingFees,
+        feesOverTime
     };
+}
+
+// ── Unified Analytics Engine (v2) ──
+
+/**
+ * Calculates a comprehensive set of portfolio metrics in a single pass.
+ * Returns 17 key metrics including PnL, Win Rate, Profit Factor, Drawdown, etc.
+ */
+export function calculatePortfolioMetrics(trades: Trade[]): PortfolioMetrics {
+    const closedTrades = trades.filter(t => t.status === 'CLOSED' || t.status === undefined); // Assume undefined is closed legacy
+
+    if (closedTrades.length === 0) {
+        return {
+            totalPnl: 0,
+            totalPnlPercentage: 0,
+            totalVolume: 0,
+            totalFees: 0,
+            winRate: 0,
+            totalTrades: 0,
+            winningTrades: 0,
+            losingTrades: 0,
+            averageWin: 0,
+            averageLoss: 0,
+            largestWin: 0,
+            largestLoss: 0,
+            profitFactor: 0,
+            averageTradeDuration: 0,
+            longShortRatio: 0,
+            maxDrawdown: 0,
+            maxDrawdownPercentage: 0,
+        };
+    }
+
+    // Initialize accumulators
+    let totalPnl = 0;
+    let totalVolume = 0;
+    let totalFees = 0;
+    let winningTrades = 0;
+    let losingTrades = 0;
+    let totalWins = 0;
+    let totalLosses = 0;
+    let largestWin = 0;
+    let largestLoss = 0;
+    let longCount = 0;
+    let shortCount = 0;
+    let totalDuration = 0;
+    let durationCount = 0;
+
+    // For Drawdown
+    let currentEquity = 0;
+    let peakEquity = 0;
+    let maxDrawdown = 0;
+
+    // Sort for drawdown calculation correctness
+    const sortedTrades = [...closedTrades].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
+    for (const trade of sortedTrades) {
+        const pnl = trade.pnl || 0;
+        const volume = (trade.price || 0) * (trade.size || 0);
+        const fee = trade.fees || 0;
+
+        totalPnl += pnl;
+        totalVolume += volume;
+        totalFees += fee;
+
+        if (pnl > 0) {
+            winningTrades++;
+            totalWins += pnl;
+            largestWin = Math.max(largestWin, pnl);
+        } else if (pnl < 0) {
+            losingTrades++;
+            totalLosses += Math.abs(pnl);
+            largestLoss = Math.max(largestLoss, Math.abs(pnl));
+        }
+
+        if (trade.side === 'LONG') longCount++;
+        else if (trade.side === 'SHORT') shortCount++;
+
+        // Duration (sanity check for valid timestamps)
+        if (trade.entryTime && trade.exitTime) {
+            const duration = new Date(trade.exitTime).getTime() - new Date(trade.entryTime).getTime();
+            if (duration > 0) {
+                totalDuration += duration;
+                durationCount++;
+            }
+        } else if (trade.duration) {
+            totalDuration += trade.duration * 1000; // Assuming trade.duration is seconds
+            durationCount++;
+        }
+
+        // Drawdown
+        currentEquity += pnl;
+        if (currentEquity > peakEquity) peakEquity = currentEquity;
+        const dd = peakEquity - currentEquity;
+        if (dd > maxDrawdown) maxDrawdown = dd;
+    }
+
+    const profitFactor = totalLosses === 0 ? (totalWins > 0 ? Infinity : 0) : totalWins / totalLosses;
+    const maxDrawdownPercentage = peakEquity > 0 ? (maxDrawdown / peakEquity) * 100 : 0;
+
+    // Calculate Sharpe Ratio (approximate)
+    const sharpeRatio = calculateSharpeRatio(closedTrades) || 0;
+
+    return {
+        totalPnl,
+        totalPnlPercentage: totalVolume > 0 ? (totalPnl / totalVolume) * 100 : 0,
+        totalVolume,
+        totalFees,
+        winRate: closedTrades.length > 0 ? (winningTrades / closedTrades.length) * 100 : 0,
+        totalTrades: closedTrades.length,
+        winningTrades,
+        losingTrades,
+        averageWin: winningTrades > 0 ? totalWins / winningTrades : 0,
+        averageLoss: losingTrades > 0 ? totalLosses / losingTrades : 0,
+        largestWin,
+        largestLoss,
+        profitFactor,
+        averageTradeDuration: durationCount > 0 ? totalDuration / durationCount : 0,
+        longShortRatio: shortCount > 0 ? longCount / shortCount : longCount > 0 ? Infinity : 0,
+        maxDrawdown,
+        maxDrawdownPercentage,
+        sharpeRatio,
+    };
+}
+
+/**
+ * Aggregates trades into daily performance buckets for equity charts.
+ */
+export function generateDailyPerformance(trades: Trade[]): DailyPerformance[] {
+    const dailyMap = new Map<string, DailyPerformance>();
+    const closedTrades = trades.filter(t => (t.status === 'CLOSED' || t.status === undefined) && t.pnl !== undefined);
+
+    for (const trade of closedTrades) {
+        // Use exitTime if available, else timestamp
+        const timeStr = trade.exitTime || trade.timestamp;
+        const dateKey = new Date(timeStr).toISOString().split('T')[0];
+        const existing = dailyMap.get(dateKey);
+
+        const pnl = trade.pnl || 0;
+        const volume = (trade.price || 0) * (trade.size || 0);
+        const fees = trade.fees || 0;
+
+        if (existing) {
+            existing.pnl += pnl;
+            existing.volume += volume;
+            existing.fees += fees;
+            existing.tradeCount += 1;
+            if (pnl > 0) existing.winCount += 1;
+            else existing.lossCount += 1;
+        } else {
+            dailyMap.set(dateKey, {
+                date: new Date(dateKey),
+                pnl,
+                cumulativePnl: 0, // Calculated later
+                volume,
+                fees,
+                tradeCount: 1,
+                winCount: pnl > 0 ? 1 : 0,
+                lossCount: pnl <= 0 ? 1 : 0,
+                drawdown: 0,
+                drawdownPercentage: 0,
+            });
+        }
+    }
+
+    // Sort by date and calculate cumulative values
+    const sorted = Array.from(dailyMap.values()).sort((a, b) => a.date.getTime() - b.date.getTime());
+
+    let cumulative = 0;
+    let peak = 0;
+
+    for (const day of sorted) {
+        cumulative += day.pnl;
+        day.cumulativePnl = cumulative;
+
+        if (cumulative > peak) peak = cumulative;
+
+        day.drawdown = peak - cumulative;
+        day.drawdownPercentage = peak > 0 ? (day.drawdown / peak) * 100 : 0;
+    }
+
+    return sorted;
 }

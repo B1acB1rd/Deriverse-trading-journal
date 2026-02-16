@@ -16,13 +16,18 @@ export function calculateFifoPnl(trades: Trade[]): Trade[] {
         (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
     );
 
-    // Separate inventory pools: longs (bought, waiting to sell) and shorts (sold, waiting to buy back)
-    const longInventory: Record<string, { price: number; qty: number }[]> = {};
-    const shortInventory: Record<string, { price: number; qty: number }[]> = {};
+    // Separate inventory pools with timestamp tracking
+    const longInventory: Record<string, { price: number; qty: number; timestamp: string }[]> = {};
+    const shortInventory: Record<string, { price: number; qty: number; timestamp: string }[]> = {};
 
     chronological.forEach(trade => {
-        // Only process actual fills (Spot and Perp). Skip Deposit, Withdraw, Funding, etc.
+        // Map marketType from positionType
         const pt = (trade.positionType || '').toLowerCase();
+        if (pt.includes('perp')) trade.marketType = 'perpetual';
+        else if (pt.includes('spot')) trade.marketType = 'spot';
+        else trade.marketType = 'spot'; // Default
+
+        // Only process actual fills (Spot and Perp). Skip Deposit, Withdraw, Funding, etc.
         if (pt !== 'spot' && pt !== 'perp') return;
 
         // Skip trades with no valid price (deposits disguised as trades, etc.)
@@ -40,6 +45,9 @@ export function calculateFifoPnl(trades: Trade[]): Trade[] {
                 // Close shorts (FIFO): PnL = (shortEntryPrice - buyClosePrice) × qty
                 let qtyToClose = trade.size;
                 let realizedPnl = 0;
+                let weightedEntryPrice = 0;
+                let totalClosedQty = 0;
+                let entryTime = trade.timestamp; // Fallback
 
                 while (qtyToClose > 0 && shortInventory[sym].length > 0) {
                     const batch = shortInventory[sym][0];
@@ -49,6 +57,11 @@ export function calculateFifoPnl(trades: Trade[]): Trade[] {
                     const batchPnl = (batch.price - trade.price) * matchedQty;
                     realizedPnl += batchPnl;
 
+                    // Track entry stats
+                    weightedEntryPrice += batch.price * matchedQty;
+                    totalClosedQty += matchedQty;
+                    if (totalClosedQty === matchedQty) entryTime = batch.timestamp; // Capture earliest
+
                     batch.qty -= matchedQty;
                     qtyToClose -= matchedQty;
 
@@ -57,20 +70,30 @@ export function calculateFifoPnl(trades: Trade[]): Trade[] {
                     }
                 }
 
-                // If any qty left over after closing all shorts, it opens a new long
+                // If any qty left over, it opens a new long
                 if (qtyToClose > 1e-9) {
-                    longInventory[sym].push({ price: trade.price, qty: qtyToClose });
+                    longInventory[sym].push({ price: trade.price, qty: qtyToClose, timestamp: trade.timestamp });
                 }
 
+                // Populate Closing Trade Details
                 trade.realizedPnl = realizedPnl;
                 const feeCost = trade.feesUsd || trade.fees || 0;
                 trade.pnl = realizedPnl - feeCost;
+
+                trade.entryPrice = totalClosedQty > 0 ? weightedEntryPrice / totalClosedQty : trade.price;
+                trade.exitPrice = trade.price;
+                trade.entryTime = entryTime;
+                trade.exitTime = trade.timestamp;
+                trade.status = 'CLOSED';
+
             } else {
                 // No shorts to close — this buy OPENS a long position
-                longInventory[sym].push({ price: trade.price, qty: trade.size });
-                // Reset PnL for opening positions — no realized gain yet
+                longInventory[sym].push({ price: trade.price, qty: trade.size, timestamp: trade.timestamp });
+                // Reset PnL for opening positions
                 trade.pnl = 0;
                 trade.realizedPnl = 0;
+                trade.entryPrice = trade.price;
+                trade.status = 'OPEN';
             }
         } else {
             // SELL: Either closing a long position or opening a short
@@ -78,6 +101,9 @@ export function calculateFifoPnl(trades: Trade[]): Trade[] {
                 // Close longs (FIFO): PnL = (sellClosePrice - longEntryPrice) × qty
                 let qtyToClose = trade.size;
                 let realizedPnl = 0;
+                let weightedEntryPrice = 0;
+                let totalClosedQty = 0;
+                let entryTime = trade.timestamp;
 
                 while (qtyToClose > 0 && longInventory[sym].length > 0) {
                     const batch = longInventory[sym][0];
@@ -87,6 +113,11 @@ export function calculateFifoPnl(trades: Trade[]): Trade[] {
                     const batchPnl = (trade.price - batch.price) * matchedQty;
                     realizedPnl += batchPnl;
 
+                    // Track entry stats
+                    weightedEntryPrice += batch.price * matchedQty;
+                    totalClosedQty += matchedQty;
+                    if (totalClosedQty === matchedQty) entryTime = batch.timestamp;
+
                     batch.qty -= matchedQty;
                     qtyToClose -= matchedQty;
 
@@ -95,20 +126,30 @@ export function calculateFifoPnl(trades: Trade[]): Trade[] {
                     }
                 }
 
-                // If any qty left over after closing all longs, it opens a new short
+                // If any qty left over, it opens a new short
                 if (qtyToClose > 1e-9) {
-                    shortInventory[sym].push({ price: trade.price, qty: qtyToClose });
+                    shortInventory[sym].push({ price: trade.price, qty: qtyToClose, timestamp: trade.timestamp });
                 }
 
+                // Populate Closing Trade Details
                 trade.realizedPnl = realizedPnl;
                 const feeCost = trade.feesUsd || trade.fees || 0;
                 trade.pnl = realizedPnl - feeCost;
+
+                trade.entryPrice = totalClosedQty > 0 ? weightedEntryPrice / totalClosedQty : trade.price;
+                trade.exitPrice = trade.price;
+                trade.entryTime = entryTime;
+                trade.exitTime = trade.timestamp;
+                trade.status = 'CLOSED';
+
             } else {
                 // No longs to close — this sell OPENS a short position
-                shortInventory[sym].push({ price: trade.price, qty: trade.size });
-                // Reset PnL for opening positions — no realized gain yet
+                shortInventory[sym].push({ price: trade.price, qty: trade.size, timestamp: trade.timestamp });
+                // Reset PnL for opening positions
                 trade.pnl = 0;
                 trade.realizedPnl = 0;
+                trade.entryPrice = trade.price;
+                trade.status = 'OPEN';
             }
         }
     });

@@ -1,5 +1,8 @@
 export type OrderType = 'MARKET' | 'LIMIT' | 'STOP_MARKET' | 'STOP_LIMIT';
 export type Side = 'LONG' | 'SHORT';
+export type TradeSide = Side; // Alias for v2 compatibility
+export type MarketType = 'spot' | 'perpetual' | 'options';
+export type TradeStatus = 'OPEN' | 'CLOSED' | 'LIQUIDATED';
 export type LiquidityTier = 'HIGH' | 'MEDIUM' | 'LOW';
 
 export interface Trade {
@@ -54,6 +57,14 @@ export interface Trade {
     markPrice?: number;
     leverage?: number;
     positionType?: string;
+
+    // v2 Analytics Fields
+    marketType?: MarketType;
+    entryPrice?: number;
+    exitPrice?: number;
+    entryTime?: string;
+    exitTime?: string;
+    tags?: string[];
 }
 
 export interface VerificationSnapshot {
@@ -117,4 +128,59 @@ export interface FeeBreakdown {
     takerFees: number;
     fundingFees: number;
     totalFees: number;
+    feesOverTime: Array<{
+        date: Date;
+        fees: number;
+        cumulativeFees: number;
+    }>;
+}
+
+// ── Analytics v2 Interfaces ──
+
+export interface PortfolioMetrics {
+    totalPnl: number;
+    totalPnlPercentage: number;
+    totalVolume: number;
+    totalFees: number;
+    winRate: number;
+    totalTrades: number;
+    winningTrades: number;
+    losingTrades: number;
+    averageWin: number;
+    averageLoss: number;
+    largestWin: number;
+    largestLoss: number;
+    profitFactor: number;
+    averageTradeDuration: number;
+    longShortRatio: number;
+    maxDrawdown: number;
+    maxDrawdownPercentage: number;
+    sharpeRatio?: number;
+}
+
+export interface DailyPerformance {
+    date: Date;
+    pnl: number;
+    cumulativePnl: number;
+    volume: number;
+    fees: number;
+    tradeCount: number;
+    winCount: number;
+    lossCount: number;
+    drawdown: number;
+    drawdownPercentage: number;
+}
+
+export interface FilterOptions {
+    dateRange: {
+        start: Date | null;
+        end: Date | null;
+    };
+    symbols: string[];
+    marketTypes: MarketType[];
+    sides: Side[];
+    status: TradeStatus[];
+    minPnl?: number;
+    maxPnl?: number;
+    timeframe?: string; // e.g. '1D', '1W', 'ALL'
 }

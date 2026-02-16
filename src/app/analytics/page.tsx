@@ -9,21 +9,21 @@ import { SymbolBreakdown } from '@/components/analytics/SymbolBreakdown';
 import { SessionPerformance } from '@/components/analytics/SessionPerformance';
 import { HourlyHeatmap } from '@/components/analytics/HourlyHeatmap';
 import { FeeBreakdownChart } from '@/components/analytics/FeeBreakdownChart';
-import { DateRangeFilter } from '@/components/common/DateRangeFilter';
+import { FilterBar } from '@/components/common/FilterBar';
+import { TradeHistoryTable } from '@/components/dashboard/TradeHistoryTable';
+import { LongShortChart } from '@/components/analytics/LongShortChart';
+import { DailyPnLChart } from '@/components/analytics/DailyPnLChart';
+import { OpenPositions } from '@/components/dashboard/OpenPositions';
 import { useTradeData } from '@/hooks/useTradeData';
 import {
-    calculateProfitFactor,
-    calculateExpectancy,
-    calculateSharpeRatio,
-    calculateSortinoRatio,
-    calculateMaxDrawdown,
+    calculatePortfolioMetrics,
     detectRevengeTrading,
     detectStreaks,
     calculatePerformanceTrend
 } from '@/lib/metrics';
-import { exportTradesToCSV } from '@/lib/export';
+import { exportTradesToCSV, exportToPDF } from '@/lib/export';
 import { formatCurrency } from '@/lib/utils';
-import { TrendingUp, TrendingDown, AlertTriangle, Activity, Target, BarChart3, Minus, Download } from 'lucide-react';
+import { TrendingUp, TrendingDown, AlertTriangle, Activity, Target, BarChart3, Minus, Download, FileText } from 'lucide-react';
 
 function MetricCard({ label, value, subtitle, icon: Icon, color = 'text-white' }: {
     label: string; value: string; subtitle?: string; icon: any; color?: string;
@@ -43,11 +43,20 @@ function MetricCard({ label, value, subtitle, icon: Icon, color = 'text-white' }
 export default function AnalyticsPage() {
     const { trades } = useTradeData();
 
-    const profitFactor = calculateProfitFactor(trades);
-    const expectancy = calculateExpectancy(trades);
-    const sharpe = calculateSharpeRatio(trades);
-    const sortino = calculateSortinoRatio(trades);
-    const { maxDrawdown, maxDrawdownPercent } = calculateMaxDrawdown(trades);
+    // Unified metrics from the analytics engine
+    const metrics = calculatePortfolioMetrics(trades);
+    const {
+        profitFactor,
+        sharpeRatio,
+        maxDrawdown,
+        maxDrawdownPercentage,
+        averageWin,
+        averageLoss,
+        winRate,
+        totalTrades
+    } = metrics;
+
+    // Behavioral
     const revengeTrades = detectRevengeTrading(trades);
     const streaks = detectStreaks(trades);
     const trend = calculatePerformanceTrend(trades);
@@ -71,17 +80,26 @@ export default function AnalyticsPage() {
                     <h2 className="text-xl md:text-2xl font-bold text-text-primary">Advanced Analytics</h2>
                     <p className="text-sm text-text-muted">Deep dive into your performance drivers.</p>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
                     <button
                         onClick={() => exportTradesToCSV(trades)}
                         className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-text-secondary bg-white/5 hover:bg-white/10 border border-glass-border rounded-lg transition-colors"
                     >
                         <Download className="w-3.5 h-3.5" />
-                        Export CSV
+                        CSV
                     </button>
-                    <DateRangeFilter />
+                    <button
+                        onClick={() => exportToPDF(trades, metrics)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-text-secondary bg-white/5 hover:bg-white/10 border border-glass-border rounded-lg transition-colors"
+                    >
+                        <FileText className="w-3.5 h-3.5" />
+                        PDF
+                    </button>
                 </div>
             </div>
+
+            {/* Advanced FilterBar - Phase 3 */}
+            <FilterBar />
 
             {/* Quant Metrics Grid */}
             <div>
@@ -95,30 +113,30 @@ export default function AnalyticsPage() {
                         color={profitFactor > 1 ? 'text-green-400' : 'text-red-400'}
                     />
                     <MetricCard
-                        label="Expectancy"
-                        value={formatCurrency(expectancy)}
-                        subtitle="Per trade avg"
+                        label="Avg Win"
+                        value={formatCurrency(averageWin)}
+                        subtitle={`Avg Loss: ${formatCurrency(averageLoss)}`}
                         icon={BarChart3}
-                        color={expectancy >= 0 ? 'text-green-400' : 'text-red-400'}
+                        color={averageWin >= 0 ? 'text-green-400' : 'text-red-400'}
                     />
                     <MetricCard
                         label="Sharpe Ratio"
-                        value={formatRatio(sharpe)}
+                        value={formatRatio(sharpeRatio ?? null)}
                         subtitle="Annualized"
                         icon={Activity}
-                        color={sharpe !== null && sharpe > 1 ? 'text-green-400' : 'text-yellow-400'}
+                        color={sharpeRatio !== undefined && sharpeRatio > 1 ? 'text-green-400' : 'text-yellow-400'}
                     />
                     <MetricCard
-                        label="Sortino Ratio"
-                        value={formatRatio(sortino)}
-                        subtitle="Downside risk"
+                        label="Win Rate"
+                        value={`${winRate.toFixed(1)}%`}
+                        subtitle={`${totalTrades} Total Trades`}
                         icon={Activity}
-                        color={sortino !== null && sortino > 1 ? 'text-green-400' : 'text-yellow-400'}
+                        color={winRate > 50 ? 'text-green-400' : 'text-yellow-400'}
                     />
                     <MetricCard
                         label="Max Drawdown"
                         value={formatCurrency(maxDrawdown)}
-                        subtitle={`${maxDrawdownPercent.toFixed(1)}% from peak`}
+                        subtitle={`${maxDrawdownPercentage.toFixed(1)}% from peak`}
                         icon={TrendingDown}
                         color="text-red-400"
                     />
@@ -181,6 +199,15 @@ export default function AnalyticsPage() {
                 </div>
             )}
 
+            {/* Daily PnL + Long/Short Charts - Phase 4 */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+                <DailyPnLChart />
+                <LongShortChart />
+            </div>
+
+            {/* Open Positions - Phase 5 */}
+            <OpenPositions />
+
             {/* Per-Symbol Table */}
             <SymbolBreakdown />
 
@@ -193,7 +220,7 @@ export default function AnalyticsPage() {
             {/* Hourly Heatmap */}
             <HourlyHeatmap />
 
-            {/* Existing Charts */}
+            {/* Attribution & Psychology Charts */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
                 <PnLAttributionChart />
                 <PsychologyChart />
@@ -202,6 +229,11 @@ export default function AnalyticsPage() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
                 <OrderTypePerformance />
                 <DrawdownChart />
+            </div>
+
+            {/* Trade History Table */}
+            <div className="mt-2">
+                <TradeHistoryTable trades={trades} />
             </div>
         </div>
     );
