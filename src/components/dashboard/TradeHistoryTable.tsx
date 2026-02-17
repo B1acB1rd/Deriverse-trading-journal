@@ -183,18 +183,16 @@ export function TradeHistoryTable({ trades, onCloseTrade }: TradeHistoryTablePro
                     const entryVal = (info.row.original.entryPrice || info.row.original.price) * info.row.original.size;
                     const percentage = entryVal > 0 ? (pnl / entryVal) : 0;
 
-                    if (pnl === 0 && info.row.original.status === 'OPEN') {
-                        return <span className="text-slate-500 italic text-xs">Open</span>;
-                    }
-
                     return (
                         <div className="flex flex-col items-end">
                             <span className={cn("font-bold tabular-nums font-mono text-sm", pnl >= 0 ? "text-emerald-400" : "text-rose-400")}>
                                 {pnl > 0 ? '+' : ''}{formatCurrency(pnl)}
                             </span>
-                            <span className={cn("text-[10px] tabular-nums", pnl >= 0 ? "text-emerald-500/70" : "text-rose-500/70")}>
-                                {pnl > 0 ? '+' : ''}{formatPercentage(percentage)}
-                            </span>
+                            {pnl !== 0 && (
+                                <span className={cn("text-[10px] tabular-nums", pnl >= 0 ? "text-emerald-500/70" : "text-rose-500/70")}>
+                                    {pnl > 0 ? '+' : ''}{formatPercentage(percentage)}
+                                </span>
+                            )}
                         </div>
                     );
                 },
@@ -205,28 +203,24 @@ export function TradeHistoryTable({ trades, onCloseTrade }: TradeHistoryTablePro
                     <span className="text-amber-500/80 tabular-nums font-mono text-xs">{formatCurrency(Math.abs(info.getValue()))}</span>
                 ),
             }),
-            columnHelper.accessor("status", {
-                header: "Status",
-                cell: (info) => {
-                    const status = info.getValue();
-                    const variant = status === 'CLOSED' ? 'default' : status === 'OPEN' ? 'success' : 'danger';
-                    return <Badge variant={variant as any}>{status}</Badge>;
-                }
-            }),
             columnHelper.accessor("chainTx", {
                 header: "",
                 id: "actions",
-                cell: (info) => (
-                    <a
-                        href={`https://explorer.solana.com/tx/${info.getValue()}?cluster=devnet`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-slate-600 hover:text-indigo-400 transition-colors p-1"
-                        title="View on Explorer"
-                    >
-                        <ExternalLink className="w-3.5 h-3.5" />
-                    </a>
-                )
+                cell: (info) => {
+                    const tx = info.getValue();
+                    if (!tx) return null;
+                    return (
+                        <a
+                            href={`https://explorer.solana.com/tx/${tx}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-slate-600 hover:text-indigo-400 transition-colors p-1"
+                            title="View on Explorer"
+                        >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                        </a>
+                    );
+                }
             })
         ],
         [onCloseTrade]

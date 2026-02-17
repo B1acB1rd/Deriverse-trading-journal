@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDatabase } from '@/lib/mongodb';
+import { ipLimiter } from '@/lib/rate-limit';
 
 export const dynamic = 'force-dynamic';
 
@@ -113,6 +114,15 @@ export async function POST(req: NextRequest) {
         if (!isValidWallet(wallet)) {
             return NextResponse.json({ success: false, error: 'Invalid wallet address' }, { status: 400 });
         }
+
+        // Rate limit by IP
+        const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+        if (!ipLimiter.check(clientIp)) {
+            return NextResponse.json({ success: false, error: 'Rate limit exceeded' }, { status: 429 });
+        }
+
+        // TODO: Production auth — require wallet ownership proof (signed message)
+        // before allowing journal writes. Currently any caller can write to any wallet.
 
         // Security: validate tradeId length
         if (typeof tradeId !== 'string' || tradeId.length > 200) {

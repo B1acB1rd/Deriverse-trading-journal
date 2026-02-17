@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Calendar, BarChart3, PieChart, Settings, BookOpen, Target, X } from 'lucide-react';
+import { LayoutDashboard, Calendar, BarChart3, PieChart, Settings, BookOpen, Target, X, HelpCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTradeData } from '@/hooks/useTradeData';
 
@@ -12,6 +12,7 @@ const NAV_ITEMS = [
     { icon: BookOpen, label: 'Journal', href: '/journal' },
     { icon: Target, label: 'Strategies', href: '/strategies' },
     { icon: BarChart3, label: 'Analytics', href: '/analytics' },
+    { icon: HelpCircle, label: 'Guide', href: '/guide' },
     { icon: Settings, label: 'Settings', href: '/settings' },
 ];
 

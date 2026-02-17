@@ -9,6 +9,16 @@ export function calculateGaslessSavings(trades: Trade[], baselinePerTrade: numbe
     return estimatedBaseline - (feesPaid + slippagePaid);
 }
 
+/**
+ * PnL Attribution — breaks down net PnL into components.
+ *
+ * SEMANTICS:
+ *   trade.pnl is NET PnL (after fees/slippage have been deducted by the FIFO calculator).
+ *   grossPnL = netPnL + fees + slippage (i.e., what profit would have been without costs)
+ *   netPnL = grossPnL - fees - slippage (equals sum of trade.pnl)
+ *
+ * This is consistent with how FIFO calculator computes: pnl = realizedPnl - feeCost.
+ */
 export function calculatePnLAttribution(trades: Trade[]): PnLAttribution {
     const grossPnL = trades.reduce((acc, t) => acc + (t.pnl + (t.fees || 0) + (t.slippage || 0)), 0);
     const feesPaid = trades.reduce((acc, t) => acc + (t.fees || 0), 0);
@@ -67,6 +77,10 @@ function getDailyReturns(trades: Trade[]): number[] {
 /**
  * Sharpe Ratio = Mean Daily Return / StdDev of Daily Returns * sqrt(252)
  * Annualized. Requires at least 2 trading days.
+ *
+ * NOTE: Uses absolute dollar PnL per day, NOT percentage returns normalized by equity.
+ * This means the ratio is not comparable across accounts of different sizes.
+ * For cross-account comparison, compute daily return = daily PnL / starting equity.
  */
 export function calculateSharpeRatio(trades: Trade[]): number | null {
     const dailyReturns = getDailyReturns(trades);
@@ -83,6 +97,8 @@ export function calculateSharpeRatio(trades: Trade[]): number | null {
 /**
  * Sortino Ratio = Mean Daily Return / Downside Deviation * sqrt(252)
  * Only penalizes negative returns (downside risk).
+ *
+ * NOTE: Same caveat as Sharpe — uses absolute dollar PnL, not % returns.
  */
 export function calculateSortinoRatio(trades: Trade[]): number | null {
     const dailyReturns = getDailyReturns(trades);
@@ -233,9 +249,16 @@ export function detectStreaks(trades: Trade[]): Streak[] {
     return streaks;
 }
 
+// Configurable thresholds for performance trend classification
+const TREND_IMPROVING_THRESHOLD = 5;   // Win rate delta above this = Improving
+const TREND_DECLINING_THRESHOLD = -5;  // Win rate delta below this = Declining
+const TREND_PNL_DECAY_FACTOR = 0.8;    // Avg PnL must drop below this fraction to be Declining
+
 /**
  * Performance Trend: Compare last 20 trades vs prior 20 trades.
  * Returns "Improving", "Stable", or "Declining".
+ *
+ * Thresholds are configurable via the constants above.
  */
 export function calculatePerformanceTrend(trades: Trade[]): {
     trend: 'Improving' | 'Stable' | 'Declining';
@@ -268,9 +291,9 @@ export function calculatePerformanceTrend(trades: Trade[]): {
     const pnlImproving = recentAvgPnl > previousAvgPnl;
 
     let trend: 'Improving' | 'Stable' | 'Declining';
-    if (winRateDelta > 5 || (winRateDelta > -2 && pnlImproving)) {
+    if (winRateDelta > TREND_IMPROVING_THRESHOLD || (winRateDelta > -2 && pnlImproving)) {
         trend = 'Improving';
-    } else if (winRateDelta < -5 || (winRateDelta < 2 && !pnlImproving && recentAvgPnl < previousAvgPnl * 0.8)) {
+    } else if (winRateDelta < TREND_DECLINING_THRESHOLD || (winRateDelta < 2 && !pnlImproving && recentAvgPnl < previousAvgPnl * TREND_PNL_DECAY_FACTOR)) {
         trend = 'Declining';
     } else {
         trend = 'Stable';

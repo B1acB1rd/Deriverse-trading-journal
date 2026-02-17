@@ -261,7 +261,7 @@ export function TradeProvider({ children }: { children: ReactNode }) {
                             orderType,
                             price: trade.price || 0,
                             size: trade.size || trade.quantity || 0,
-                            fees: trade.fee || 0,
+                            fees: trade.fees || 0,
                             pnl: trade.pnl || 0,
                             realizedPnl: 0,
                             unrealizedPnl: 0,

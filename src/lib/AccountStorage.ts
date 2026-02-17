@@ -28,7 +28,7 @@ export async function storeTrades(walletAddress: string, trades: any[]): Promise
                 symbol: trade.symbol || 'Unknown',
                 price: Number(trade.price) || 0,
                 size: Number(trade.size) || 0,
-                fee: Number(trade.fee) || 0,
+                fees: Number(trade.fees ?? trade.fee ?? trade.feesUsd) || 0,
                 pnl: Number(trade.pnl) || 0,
                 realizedPnl: Number(trade.realizedPnl) || 0,
                 timestamp: new Date(trade.timestamp || Date.now()),
@@ -129,7 +129,7 @@ export async function updateAccountStats(walletAddress: string, perpStats?: any[
             $group: {
                 _id: '$walletAddress',
                 totalRealizedPnl: { $sum: '$realizedPnl' },
-                totalFees: { $sum: '$fee' },
+                totalFees: { $sum: '$fees' },
                 tradeCount: { $sum: 1 }
             }
         }

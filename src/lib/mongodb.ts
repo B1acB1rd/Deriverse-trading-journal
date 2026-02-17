@@ -1,20 +1,34 @@
 import { MongoClient, Db, Collection, ObjectId } from 'mongodb';
 
 // MongoDB connection configuration
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017';
+const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+const MONGODB_URI = process.env.MONGODB_URI;
 const DB_NAME = process.env.MONGODB_DB_NAME || 'deriverse_analytics';
+
+// Fail loud in production if no MongoDB URI is configured
+if (IS_PRODUCTION && !MONGODB_URI) {
+    throw new Error('[MongoDB] MONGODB_URI is required in production. Set it in your environment variables.');
+}
+
+const RESOLVED_URI = MONGODB_URI || 'mongodb://localhost:27017';
 
 let client: MongoClient | null = null;
 let db: Db | null = null;
 
 /**
  * Get MongoDB client (singleton pattern)
+ * Hardened: TLS in production, connection pool, retry writes, timeouts.
  */
 export async function getMongoClient(): Promise<MongoClient> {
     if (!client) {
-        client = new MongoClient(MONGODB_URI, {
+        client = new MongoClient(RESOLVED_URI, {
             serverSelectionTimeoutMS: 5000,
             connectTimeoutMS: 5000,
+            maxPoolSize: 10,
+            minPoolSize: 1,
+            retryWrites: true,
+            retryReads: true,
+            ...(IS_PRODUCTION ? { tls: true } : {}),
         });
         await client.connect();
         console.log('[MongoDB] Connected to database');
@@ -55,7 +69,7 @@ export interface TradeDocument {
     symbol: string;
     price: number;
     size: number;
-    fee: number;
+    fees: number;
     pnl: number;
     realizedPnl: number;
     timestamp: Date;
@@ -115,9 +129,10 @@ export async function initializeIndexes(): Promise<void> {
     await journal.createIndex({ walletAddress: 1, tradeId: 1 }, { unique: true });
     await journal.createIndex({ walletAddress: 1 });
 
-    // Create indexes for trader_dna cache
+    // Create indexes for trader_dna cache with TTL (auto-expire after 24h)
     const traderDna = database.collection('trader_dna');
     await traderDna.createIndex({ walletAddress: 1 }, { unique: true });
+    await traderDna.createIndex({ cachedAt: 1 }, { expireAfterSeconds: 86400 });
 
     console.log('[MongoDB] Indexes initialized');
 }

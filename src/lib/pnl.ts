@@ -77,7 +77,7 @@ export function calculateFifoPnl(trades: Trade[]): Trade[] {
 
                 // Populate Closing Trade Details
                 trade.realizedPnl = realizedPnl;
-                const feeCost = trade.feesUsd || trade.fees || 0;
+                const feeCost = trade.fees || 0;
                 trade.pnl = realizedPnl - feeCost;
 
                 trade.entryPrice = totalClosedQty > 0 ? weightedEntryPrice / totalClosedQty : trade.price;
@@ -133,7 +133,7 @@ export function calculateFifoPnl(trades: Trade[]): Trade[] {
 
                 // Populate Closing Trade Details
                 trade.realizedPnl = realizedPnl;
-                const feeCost = trade.feesUsd || trade.fees || 0;
+                const feeCost = trade.fees || 0;
                 trade.pnl = realizedPnl - feeCost;
 
                 trade.entryPrice = totalClosedQty > 0 ? weightedEntryPrice / totalClosedQty : trade.price;

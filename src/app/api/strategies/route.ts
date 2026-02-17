@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDatabase } from '@/lib/mongodb';
+import { ipLimiter } from '@/lib/rate-limit';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,6 +36,12 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ success: false, error: 'Invalid wallet address' }, { status: 400 });
         }
 
+        // Rate limit by IP
+        const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+        if (!ipLimiter.check(clientIp)) {
+            return NextResponse.json({ success: false, error: 'Rate limit exceeded' }, { status: 429 });
+        }
+
         const db = await getDatabase();
         await db.collection('strategies').updateOne(
             { walletAddress: wallet },
@@ -61,6 +68,12 @@ export async function DELETE(req: NextRequest) {
         }
         if (!isValidWallet(wallet)) {
             return NextResponse.json({ success: false, error: 'Invalid wallet address' }, { status: 400 });
+        }
+
+        // Rate limit by IP
+        const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+        if (!ipLimiter.check(clientIp)) {
+            return NextResponse.json({ success: false, error: 'Rate limit exceeded' }, { status: 429 });
         }
 
         const db = await getDatabase();

@@ -184,7 +184,7 @@ export class DeriverseService {
                         }
                     }
                 } catch (e) {
-
+                    console.warn(`[DeriverseService] Failed to process balance for mint ${mintStr}:`, e);
                 }
             };
 
@@ -704,7 +704,7 @@ export class DeriverseService {
                                         price: 0,
                                         size: amountVal,
                                         pnl: 0,
-                                        fee: 0,
+                                        fees: 0,
                                         timestamp,
                                         status: 'COMPLETED',
                                         section: 'Deposit',
@@ -728,7 +728,7 @@ export class DeriverseService {
                                         price: 0,
                                         size: toNumber(l.amount),
                                         pnl: 0,
-                                        fee: 0,
+                                        fees: 0,
                                         timestamp,
                                         status: 'COMPLETED',
                                         section: 'Withdraw',
@@ -751,7 +751,7 @@ export class DeriverseService {
                                     price: toNumber(l.price),
                                     size: toNumber(l.qty),
                                     pnl: 0,
-                                    fee: toNumber(l.rebates),
+                                    fees: toNumber(l.rebates),
                                     timestamp,
                                     status: 'FILLED',
                                     section: 'Spot',
@@ -782,7 +782,7 @@ export class DeriverseService {
                                     price: 0,
                                     size: toNumber(l.amount || l.funds),
                                     pnl: 0,
-                                    fee: 0,
+                                    fees: 0,
                                     timestamp,
                                     status: 'COMPLETED',
                                     section: 'Perp Deposit',
@@ -804,7 +804,7 @@ export class DeriverseService {
                                     price: 0,
                                     size: toNumber(l.amount || l.funds),
                                     pnl: 0,
-                                    fee: 0,
+                                    fees: 0,
                                     timestamp,
                                     status: 'COMPLETED',
                                     section: 'Perp Withdraw',
@@ -831,7 +831,7 @@ export class DeriverseService {
                                         price: tokens > 0 ? crncy / tokens : 0,
                                         size: qty || tokens,
                                         pnl: 0,
-                                        fee: 0,
+                                        fees: 0,
                                         timestamp,
                                         status: 'FILLED',
                                         section: 'Spot',
@@ -858,7 +858,7 @@ export class DeriverseService {
                                         price: perpPrice,
                                         size: Math.abs(perpSize),
                                         pnl: 0,
-                                        fee: 0,
+                                        fees: 0,
                                         timestamp,
                                         status: 'FILLED',
                                         section: 'Perp',
@@ -883,7 +883,7 @@ export class DeriverseService {
                                         price: 0,
                                         size: Math.abs(fundingAmount),
                                         pnl: fundingAmount,
-                                        fee: 0,
+                                        fees: 0,
                                         timestamp,
                                         status: 'COMPLETED',
                                         section: 'Funding',
@@ -926,7 +926,7 @@ export class DeriverseService {
                                     price: avgPrice,
                                     size: toNumber(myOrder.qty),
                                     pnl: 0,
-                                    fee: txFees,
+                                    fees: txFees,
                                     timestamp,
                                     status: 'FILLED',
                                     section: 'Spot',

@@ -2,8 +2,29 @@ import { NextRequest, NextResponse } from 'next/server';
 import { DeriverseService } from '@/services/DeriverseService';
 import { storeTrades, getTrades, updateAccountStats, getAccountStats, getLatestTradeSignature } from '@/lib/AccountStorage';
 import { initializeIndexes } from '@/lib/mongodb';
+import { ipLimiter } from '@/lib/rate-limit';
 
 export const dynamic = 'force-dynamic';
+
+/** Validate RPC URL: must be HTTPS, no private IPs, no localhost */
+function isAllowedRpcUrl(url: string): boolean {
+    try {
+        const parsed = new URL(url);
+        if (parsed.protocol !== 'https:') return false;
+        const hostname = parsed.hostname.toLowerCase();
+        // Block private/reserved ranges
+        if (hostname === 'localhost' || hostname === '0.0.0.0') return false;
+        if (/^127\./.test(hostname)) return false;
+        if (/^10\./.test(hostname)) return false;
+        if (/^172\.(1[6-9]|2\d|3[01])\./.test(hostname)) return false;
+        if (/^192\.168\./.test(hostname)) return false;
+        if (/^169\.254\./.test(hostname)) return false;
+        if (hostname.endsWith('.internal') || hostname.endsWith('.local')) return false;
+        return true;
+    } catch {
+        return false;
+    }
+}
 
 
 let indexesInitialized = false;
@@ -33,10 +54,21 @@ export async function GET(req: NextRequest) {
             }
         }
 
+        // Rate limit by IP
+        const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+        if (!ipLimiter.check(clientIp)) {
+            return NextResponse.json({ success: false, error: 'Rate limit exceeded' }, { status: 429 });
+        }
+
         const service = DeriverseService.getInstance();
-        // Apply custom RPC if provided (optional, does not interfere if absent)
+        // Apply custom RPC if provided — SSRF-validated
         const customRpc = searchParams.get('rpc');
-        if (customRpc) service.setCustomRpc(customRpc);
+        if (customRpc) {
+            if (!isAllowedRpcUrl(customRpc)) {
+                return NextResponse.json({ success: false, error: 'Invalid RPC URL. Only HTTPS public endpoints allowed.' }, { status: 400 });
+            }
+            service.setCustomRpc(customRpc);
+        }
         const clientData = await service.fetchClientData(wallet);
 
         if (!clientData) {
@@ -95,7 +127,7 @@ export async function GET(req: NextRequest) {
             price: t.price,
             size: t.size,
             pnl: t.pnl,
-            fee: t.fee,
+            fees: t.fees,
             realizedPnl: t.realizedPnl,
             timestamp: t.timestamp instanceof Date ? t.timestamp.toISOString() : t.timestamp,
             status: 'COMPLETED',

@@ -25,6 +25,15 @@ const createTrade = (overrides: Partial<Trade> = {}): Trade => ({
     ...overrides
 });
 
+/**
+ * Helper: After calculateFifoPnl, results are in reverse-chronological order
+ * (newest first). Use this to find the closing trade (latest timestamp).
+ */
+function findCloseTrade(result: Trade[]): Trade {
+    // result[0] = newest = the close trade (latest timestamp)
+    return result[0];
+}
+
 async function runTests() {
     console.log("Running PnL Tests...");
     let passed = 0;
@@ -47,21 +56,20 @@ async function runTests() {
             createTrade({ timestamp: '2023-01-02', side: 'SHORT', price: 110, size: 1 }) // Sell to Close
         ];
         const result = calculateFifoPnl(trades);
-        const closeTrade = result[1];
+        const closeTrade = findCloseTrade(result);
         // Profit = (110 - 100) * 1 = 10
         assert(closeTrade.realizedPnl === 10, `Simple Long: Expected 10, got ${closeTrade.realizedPnl}`);
     }
 
     // 2. Simple Short Profit (Open Short, Buy to Close)
     {
-        // SHORT opens a position in shortInventory
-        // LONG closes it: PnL = (shortEntry - buyClose) * qty = (100 - 90) * 1 = 10
         const trades = [
             createTrade({ timestamp: '2023-01-01', side: 'SHORT', price: 100, size: 1 }),
             createTrade({ timestamp: '2023-01-02', side: 'LONG', price: 90, size: 1 })
         ];
         const result = calculateFifoPnl(trades);
-        const closeTrade = result[1];
+        const closeTrade = findCloseTrade(result);
+        // PnL = (100 - 90) * 1 = 10
         assert(closeTrade.realizedPnl === 10, `Simple Short: Expected 10, got ${closeTrade.realizedPnl}`);
     }
 
@@ -73,12 +81,13 @@ async function runTests() {
             createTrade({ timestamp: '2023-01-03', side: 'SHORT', price: 120, size: 1 })  // Sell 1
         ];
         const result = calculateFifoPnl(trades);
+        // result[0] = Jan 03 (newest close), result[1] = Jan 02 (first close), result[2] = Jan 01 (open)
 
-        // Trade 2: (110 - 100) * 1 = 10
+        // Trade Jan 03: (120 - 100) * 1 = 20
+        assert(result[0].realizedPnl === 20, `Partial 2: Expected 20, got ${result[0].realizedPnl}`);
+
+        // Trade Jan 02: (110 - 100) * 1 = 10
         assert(result[1].realizedPnl === 10, `Partial 1: Expected 10, got ${result[1].realizedPnl}`);
-
-        // Trade 3: (120 - 100) * 1 = 20
-        assert(result[2].realizedPnl === 20, `Partial 2: Expected 20, got ${result[2].realizedPnl}`);
     }
 
     // 4. Multiple Entries (FIFO)
@@ -94,22 +103,24 @@ async function runTests() {
         // Total Realized = 25
 
         const result = calculateFifoPnl(trades);
-        assert(result[2].realizedPnl === 25, `Multi Entry: Expected 25, got ${result[2].realizedPnl}`);
+        const closeTrade = findCloseTrade(result);
+        assert(closeTrade.realizedPnl === 25, `Multi Entry: Expected 25, got ${closeTrade.realizedPnl}`);
     }
 
     // 5. Fee Deduction (Net PnL)
     {
         const trades = [
             createTrade({ timestamp: '2023-01-01', side: 'LONG', price: 100, size: 1 }),
-            createTrade({ timestamp: '2023-01-02', side: 'SHORT', price: 110, size: 1, feesUsd: 2 })
+            createTrade({ timestamp: '2023-01-02', side: 'SHORT', price: 110, size: 1, fees: 2 })
         ];
         // Realized (Gross) = 10
         // Net PnL = 10 - 2 = 8
         const result = calculateFifoPnl(trades);
-        assert(result[1].pnl === 8, `Net PnL: Expected 8, got ${result[1].pnl}`);
+        const closeTrade = findCloseTrade(result);
+        assert(closeTrade.pnl === 8, `Net PnL: Expected 8, got ${closeTrade.pnl}`);
     }
 
-    // ── NEW: Perp-specific tests ──
+    // ── Perp-specific tests ──
 
     // 6. Perp Long Profit
     {
@@ -118,8 +129,9 @@ async function runTests() {
             createTrade({ timestamp: '2023-01-02', side: 'SHORT', price: 80, size: 0.5, symbol: 'SOL-PERP', positionType: 'Perp' })
         ];
         const result = calculateFifoPnl(trades);
+        const closeTrade = findCloseTrade(result);
         // PnL = (80 - 75) * 0.5 = 2.5
-        assert(result[1].realizedPnl === 2.5, `Perp Long: Expected 2.5, got ${result[1].realizedPnl}`);
+        assert(closeTrade.realizedPnl === 2.5, `Perp Long: Expected 2.5, got ${closeTrade.realizedPnl}`);
     }
 
     // 7. Perp Short Profit
@@ -129,8 +141,9 @@ async function runTests() {
             createTrade({ timestamp: '2023-01-02', side: 'LONG', price: 70, size: 1, symbol: 'SOL-PERP', positionType: 'Perp' })
         ];
         const result = calculateFifoPnl(trades);
+        const closeTrade = findCloseTrade(result);
         // PnL = (80 - 70) * 1 = 10
-        assert(result[1].realizedPnl === 10, `Perp Short: Expected 10, got ${result[1].realizedPnl}`);
+        assert(closeTrade.realizedPnl === 10, `Perp Short: Expected 10, got ${closeTrade.realizedPnl}`);
     }
 
     // 8. Deposits/Withdrawals are SKIPPED (no ghost PnL)
@@ -140,9 +153,10 @@ async function runTests() {
             createTrade({ timestamp: '2023-01-02', side: 'LONG', price: 75, size: 0.5, symbol: 'SOL-PERP', positionType: 'Perp' }),
         ];
         const result = calculateFifoPnl(trades);
+        // result[0] = Jan 02 (newest), result[1] = Jan 01 (oldest)
         // The deposit should NOT affect PnL at all
-        assert(result[0].pnl === 0, `Deposit Ghost: Expected PnL 0, got ${result[0].pnl}`);
-        assert(result[1].pnl === 0, `Perp Open: Expected PnL 0 (no close yet), got ${result[1].pnl}`);
+        assert(result[1].pnl === 0, `Deposit Ghost: Expected PnL 0, got ${result[1].pnl}`);
+        assert(result[0].pnl === 0, `Perp Open: Expected PnL 0 (no close yet), got ${result[0].pnl}`);
     }
 
     // 9. Zero-price trades are skipped (safety)
@@ -152,8 +166,9 @@ async function runTests() {
             createTrade({ timestamp: '2023-01-02', side: 'SHORT', price: 110, size: 1, positionType: 'Spot' })
         ];
         const result = calculateFifoPnl(trades);
+        const closeTrade = findCloseTrade(result);
         // The zero-price buy should be skipped, so the sell opens a short instead
-        assert(result[1].pnl === 0, `Zero Price: Expected 0 (no match), got ${result[1].pnl}`);
+        assert(closeTrade.pnl === 0, `Zero Price: Expected 0 (no match), got ${closeTrade.pnl}`);
     }
 
     // 10. Short Loss
@@ -163,8 +178,39 @@ async function runTests() {
             createTrade({ timestamp: '2023-01-02', side: 'LONG', price: 120, size: 1 }) // Buy back higher = loss
         ];
         const result = calculateFifoPnl(trades);
+        const closeTrade = findCloseTrade(result);
         // PnL = (100 - 120) * 1 = -20 (loss)
-        assert(result[1].realizedPnl === -20, `Short Loss: Expected -20, got ${result[1].realizedPnl}`);
+        assert(closeTrade.realizedPnl === -20, `Short Loss: Expected -20, got ${closeTrade.realizedPnl}`);
+    }
+
+    // 11. Short Fee Deduction
+    {
+        const trades = [
+            createTrade({ timestamp: '2023-01-01', side: 'SHORT', price: 100, size: 1 }),
+            createTrade({ timestamp: '2023-01-02', side: 'LONG', price: 90, size: 1, fees: 1 })
+        ];
+        const result = calculateFifoPnl(trades);
+        const closeTrade = findCloseTrade(result);
+        // Realized = (100 - 90) * 1 = 10; Net = 10 - 1 = 9
+        assert(closeTrade.realizedPnl === 10, `Short Fee Gross: Expected 10, got ${closeTrade.realizedPnl}`);
+        assert(closeTrade.pnl === 9, `Short Fee Net: Expected 9, got ${closeTrade.pnl}`);
+    }
+
+    // 12. Mixed Long + Short on same symbol
+    {
+        const trades = [
+            createTrade({ timestamp: '2023-01-01', side: 'LONG', price: 100, size: 1 }),
+            createTrade({ timestamp: '2023-01-02', side: 'SHORT', price: 110, size: 2 }), // Close 1 long + open 1 short
+            createTrade({ timestamp: '2023-01-03', side: 'LONG', price: 105, size: 1 })   // Close 1 short
+        ];
+        const result = calculateFifoPnl(trades);
+        // result[0] = Jan 03 (newest), result[1] = Jan 02, result[2] = Jan 01
+
+        // Jan 02: Closes 1 long @ 100, sell @ 110 → PnL = 10. Opens 1 short @ 110.
+        assert(result[1].realizedPnl === 10, `Mixed L: Expected 10, got ${result[1].realizedPnl}`);
+
+        // Jan 03: Closes 1 short @ 110, buy @ 105 → PnL = (110 - 105) * 1 = 5
+        assert(result[0].realizedPnl === 5, `Mixed S: Expected 5, got ${result[0].realizedPnl}`);
     }
 
     console.log(`\nTests Complete: ${passed} Passed, ${failed} Failed.`);

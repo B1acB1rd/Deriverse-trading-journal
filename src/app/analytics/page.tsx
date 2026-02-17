@@ -13,7 +13,6 @@ import { FilterBar } from '@/components/common/FilterBar';
 import { TradeHistoryTable } from '@/components/dashboard/TradeHistoryTable';
 import { LongShortChart } from '@/components/analytics/LongShortChart';
 import { DailyPnLChart } from '@/components/analytics/DailyPnLChart';
-import { OpenPositions } from '@/components/dashboard/OpenPositions';
 import { useTradeData } from '@/hooks/useTradeData';
 import {
     calculatePortfolioMetrics,
@@ -204,9 +203,6 @@ export default function AnalyticsPage() {
                 <DailyPnLChart />
                 <LongShortChart />
             </div>
-
-            {/* Open Positions - Phase 5 */}
-            <OpenPositions />
 
             {/* Per-Symbol Table */}
             <SymbolBreakdown />

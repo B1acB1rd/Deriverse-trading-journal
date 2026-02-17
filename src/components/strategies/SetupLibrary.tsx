@@ -11,10 +11,7 @@ interface Setup {
     tags: string[];
 }
 
-const DEFAULT_SETUPS: Setup[] = [
-    { id: '1', name: 'Bull Flag', description: 'Continuation pattern after a strong impulse move.', tags: ['Trend', 'Continuation'] },
-    { id: '2', name: 'Key Level Reversal', description: 'Rejection from higher timeframe support/resistance.', tags: ['Reversal', 'Mean Reversion'] },
-];
+const DEFAULT_SETUPS: Setup[] = [];
 
 export function SetupLibrary() {
     const { walletAddress } = useTradeData();

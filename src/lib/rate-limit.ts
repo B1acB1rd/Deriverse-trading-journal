@@ -1,12 +1,22 @@
+/**
+ * In-memory rate limiter with auto-cleanup and bounded map size.
+ * For production, replace with Redis-backed limiter.
+ */
 export class RateLimiter {
     private requests: Map<string, number[]>;
     private limit: number;
     private window: number;
+    private maxKeys: number;
+    private cleanupTimer: ReturnType<typeof setInterval> | null = null;
 
-    constructor(limit: number, windowMs: number) {
+    constructor(limit: number, windowMs: number, maxKeys: number = 10000) {
         this.requests = new Map();
         this.limit = limit;
         this.window = windowMs;
+        this.maxKeys = maxKeys;
+
+        // Auto-cleanup every 60s to prevent memory leaks
+        this.startCleanup();
     }
 
     check(key: string): boolean {
@@ -22,10 +32,21 @@ export class RateLimiter {
 
         validTimestamps.push(now);
         this.requests.set(key, validTimestamps);
+
+        // Evict oldest keys if map exceeds max size (OOM protection)
+        if (this.requests.size > this.maxKeys) {
+            const keysToRemove = this.requests.size - this.maxKeys;
+            const iter = this.requests.keys();
+            for (let i = 0; i < keysToRemove; i++) {
+                const key = iter.next().value;
+                if (key) this.requests.delete(key);
+            }
+        }
+
         return true;
     }
 
-    // Optional: Prune old keys to prevent memory leaks in long-running processes
+    /** Prune expired keys to prevent memory leaks */
     cleanup() {
         const now = Date.now();
         for (const [key, timestamps] of this.requests.entries()) {
@@ -35,6 +56,24 @@ export class RateLimiter {
             } else {
                 this.requests.set(key, valid);
             }
+        }
+    }
+
+    /** Start periodic cleanup (every 60s) */
+    startCleanup() {
+        if (this.cleanupTimer) return;
+        this.cleanupTimer = setInterval(() => this.cleanup(), 60_000);
+        // Allow process to exit even if timer is active
+        if (this.cleanupTimer.unref) {
+            this.cleanupTimer.unref();
+        }
+    }
+
+    /** Stop periodic cleanup */
+    stopCleanup() {
+        if (this.cleanupTimer) {
+            clearInterval(this.cleanupTimer);
+            this.cleanupTimer = null;
         }
     }
 }

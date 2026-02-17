@@ -1,13 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { analyzeTraderDNA, calculateAlgorithmicDNA } from '@/services/TraderDNAService';
 import { getDatabase } from '@/lib/mongodb';
+import { ipLimiter } from '@/lib/rate-limit';
 
 export const dynamic = 'force-dynamic';
+
+// Validate Solana wallet address (base58, 32-44 chars)
+function isValidWallet(address: string): boolean {
+    return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(address);
+}
 
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 export async function POST(req: NextRequest) {
     try {
+        // Rate limit by IP
+        const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+        if (!ipLimiter.check(clientIp)) {
+            return NextResponse.json({ success: false, error: 'Rate limit exceeded' }, { status: 429 });
+        }
+
         const body = await req.json();
         const { trades, wallet } = body;
 
@@ -16,6 +28,11 @@ export async function POST(req: NextRequest) {
                 success: false,
                 error: 'Trades array required'
             }, { status: 400 });
+        }
+
+        // Validate wallet if provided
+        if (wallet && !isValidWallet(wallet)) {
+            return NextResponse.json({ success: false, error: 'Invalid wallet address' }, { status: 400 });
         }
 
         // Check cache if wallet provided
@@ -41,7 +58,8 @@ export async function POST(req: NextRequest) {
 
         const dna = await analyzeTraderDNA(trades);
 
-        // Cache result if wallet provided
+        // Cache result server-side if wallet provided (writes are server-controlled,
+        // not from client-supplied DNA data — prevents cache poisoning)
         if (wallet && dna) {
             try {
                 const db = await getDatabase();
